@@ -2,7 +2,9 @@ import axios from "axios";
 import type { Invoice } from "@receipt-app/shared";
 
 // 1. Configuration: Localhost Backend
-const API_URL = "https://polemoniaceous-disclamatory-brett.ngrok-free.dev/";
+// const API_URL = "http://localhost:8000";
+const API_URL = "https://polemoniaceous-disclamatory-brett.ngrok-free.dev";
+
 
 // 2. TypeScript Definitions for Zoho SDK (UPDATED)
 
@@ -12,13 +14,21 @@ const API_URL = "https://polemoniaceous-disclamatory-brett.ngrok-free.dev/";
 //   return urlParams.get(param);
 // };
 
-
 export const api = {
   // Fetch the list (GET /invoices)
   getInvoices: async (): Promise<Invoice[]> => {
     // Note: We use direct Axios for invoices because your backend is Localhost
     // and we enabled CORS in FastAPI.
-    const response = await axios.get(`${API_URL}/invoices`);
+    const response = await axios.get(`${API_URL}/invoices`, {
+      headers: {
+        // Option 1: ngrok skip browser warning header
+        "ngrok-skip-browser-warning": "true",
+
+        // Option 2 (optional): custom User-Agent (if you want to use this)
+        // 'User-Agent': 'MyCustomAgent/1.0',
+      },
+    });
+    console.log("Fetched invoices:", response.data);
     return response.data;
   },
 
@@ -28,7 +38,10 @@ export const api = {
     formData.append("file", file);
 
     const response = await axios.post(`${API_URL}/upload`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
+      headers: {
+        "Content-Type": "multipart/form-data",
+        "ngrok-skip-browser-warning": "true",
+      },
     });
 
     console.log("Upload response:", response.data);
@@ -37,7 +50,15 @@ export const api = {
 
   getCustomers: async () => {
     try {
-      const response = await axios.get(`${API_URL}/customers`);
+      const response = await axios.get(`${API_URL}/customers`, {
+        headers: {
+          // Option 1: ngrok skip browser warning header
+          "ngrok-skip-browser-warning": "true",
+
+          // Option 2 (optional): custom User-Agent (if you want to use this)
+          // 'User-Agent': 'MyCustomAgent/1.0',
+        },
+      });
       return response.data;
     } catch (err) {
       return []; // Fallback
@@ -46,7 +67,15 @@ export const api = {
 
   approveInvoice: async (data: any) => {
     // Allow 'any' or define complex type
-    const response = await axios.post(`${API_URL}/approve`, data);
+    const response = await axios.post(`${API_URL}/approve`, data, {
+      headers: {
+        // Option 1: ngrok skip browser warning header
+        "ngrok-skip-browser-warning": "true",
+
+        // Option 2 (optional): custom User-Agent (if you want to use this)
+        // 'User-Agent': 'MyCustomAgent/1.0',
+      },
+    });
     return response.data;
   },
 
@@ -55,7 +84,15 @@ export const api = {
   > => {
     try {
       // Calls your FastAPI backend, which handles the Zoho Auth
-      const response = await axios.get(`${API_URL}/accounts`);
+      const response = await axios.get(`${API_URL}/accounts`, {
+        headers: {
+          // Option 1: ngrok skip browser warning header
+          "ngrok-skip-browser-warning": "true",
+
+          // Option 2 (optional): custom User-Agent (if you want to use this)
+          // 'User-Agent': 'MyCustomAgent/1.0',
+        },
+      });
       return response.data;
     } catch (err) {
       console.error("Failed to fetch accounts via Backend", err);

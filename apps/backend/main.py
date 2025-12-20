@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, Form, UploadFile, File
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -33,15 +33,15 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 # --- CONFIGURATION ---
 # UPDATE THIS WITH YOUR CURRENT NGROK URL
-BASE_URL = "http://localhost:8000"
-
+# BASE_URL = "http://localhost:8000"  # e.g., "https://abcd1234.ngrok.io"
+BASE_URL = "https://polemoniaceous-disclamatory-brett.ngrok-free.dev"
 # --- 1. CORS ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"], 
 )
 
 # --- 2. STATIC FILES ---
@@ -71,6 +71,18 @@ class ComplianceResult(BaseModel):
     confidenceScore: float
     checklist: ComplianceChecklist # <--- Added this
 
+
+class BankTransaction(BaseModel):
+    date: str
+    description: str
+    amount: float
+
+
+class BankStatementData(BaseModel):
+    openingBalance: float
+    closingBalance: float
+    transactions: List[BankTransaction]
+    
 class Invoice(BaseModel):
     id: str
     vendor: str
@@ -80,7 +92,14 @@ class Invoice(BaseModel):
     invoiceNumber: Optional[str] = None
     status: str
     imageUrl: str
+
+    category: str
+
+    # 🔥 THIS IS WHAT WAS DROPPING YOUR DATA
+    bankStatementData: Optional[BankStatementData] = None
+
     compliance: ComplianceResult
+
     
 # --- NEW DATA MODELS ---
 class LineItem(BaseModel):
@@ -111,6 +130,8 @@ class ApproveRequest(BaseModel):
     amount: float
     lineItems: List[LineItem]
 
+
+    
 # --- 4. IN-MEMORY DB ---
 invoices_db = [] 
 
@@ -129,26 +150,68 @@ def get_invoices():
     return list(reversed(invoices_db))
 
 @app.post("/upload")
-async def upload_invoice(file: UploadFile = File(...)):
+async def upload_invoice(
+    file: UploadFile = File(...), 
+    category: str = Form("bill") # <--- NEW: Accept category as Form Data, default to 'bill'
+):
+     # --- BANK STATEMENT DEMO LOGIC ---
+    if category == "bank_statement":
+        print("--- Bank Statement Received: Returning Mock Data ---")
+        time.sleep(1) # Simulate processing
+        
+        mock_statement_data = {
+            "openingBalance": 1000.00,
+            "closingBalance": 2550.50,
+            "transactions": [
+                {"date": "2025-12-01", "description": "ACH Deposit - Client A", "amount": 2000.00},
+                {"date": "2025-12-05", "description": "Withdrawal - ATM", "amount": -100.00},
+                {"date": "2025-12-10", "description": "Stripe Payout", "amount": 750.50},
+            ]
+        }
+        
+        # We must return an object that matches the 'Invoice' model.
+        bank_statement_invoice = {
+            "id": str(int(time.time())),
+            "vendor": "Emirates NBD - Bank Statement",
+            "date": "2025-12-31",
+            "amount": mock_statement_data["closingBalance"],
+            "currency": "AED",
+            "invoiceNumber": None,
+            "status": "review",
+            "imageUrl": f"{BASE_URL}/images/report.pdf",
+            
+            # --- THE FIXES ---
+            "category": "bank_statement", # <-- MUST ADD THIS
+            "bankStatementData": mock_statement_data, # <-- MUST ADD THIS
+            
+            "compliance": {
+                "isCompliant": True, "missingFields": [], "confidenceScore": 1.0,
+                # Create a default "passing" checklist
+                "checklist": { "taxInvoiceLabel": True, "supplierName": True, "supplierAddress": True, "supplierTRN": True, "customerName": True, "customerAddress": True, "customerTRN": True, "invoiceDate": True, "invoiceNumber": True, "lineItemsDetailed": True, "subtotalExclVAT": True, "vatRateShown": True, "vatAmountShown": True, "totalAmountMatch": True }
+            }
+        }
+        print("Returning Mock Bank Statement Invoice:", bank_statement_invoice)
+        invoices_db.append(bank_statement_invoice)
+        return bank_statement_invoice
     
-    # 1. Save File
+    # 1. Save File (Existing logic)
     filename = f"{int(time.time())}_{file.filename}"
     file_location = f"uploads/{filename}"
     
     with open(file_location, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
         
-    # 2. Read for AI
+    # 2. Read for AI (Existing logic)
     with open(file_location, "rb") as f:
         file_bytes = f.read()
     
-    print(f"--- Sending to Gemini AI: {filename} ---")
+    file_type = file.content_type or "image/jpeg"
     
-    # 3. Analyze
-    ai_result = analyze_receipt_with_gemini(file_bytes)
-    print("Gemini Result:", ai_result)
-
-    # 4. Extract Checklist safely (handle missing keys by defaulting to False)
+    # 3. Analyze (Existing logic)
+    print(f"--- Processing {category.upper()} : {filename} ---")
+    ai_result = analyze_receipt_with_gemini(file_bytes, file_type)
+    
+# --- ADD THIS BLOCK ---
     checklist_data = ai_result.get("compliance_checklist", {})
     
     checklist_obj = {
@@ -167,8 +230,8 @@ async def upload_invoice(file: UploadFile = File(...)):
         "vatAmountShown": checklist_data.get("vatAmountShown", False),
         "totalAmountMatch": checklist_data.get("totalAmountMatch", False),
     }
-
-    # 5. Create Invoice Object
+    # ----------------------
+    # 4. Create Invoice Object
     new_invoice = {
         "id": str(int(time.time())),
         "vendor": ai_result.get("vendor", "Unknown"),
@@ -178,6 +241,10 @@ async def upload_invoice(file: UploadFile = File(...)):
         "invoiceNumber": ai_result.get("invoice_number"),
         "status": "review" if not ai_result.get("isCompliant") else "queue",
         "imageUrl": f"{BASE_URL}/images/{filename}",
+        
+        # NEW: Save the category
+        "category": category, 
+        
         "compliance": {
             "isCompliant": ai_result.get("isCompliant", False),
             "missingFields": ai_result.get("missingFields", []),
@@ -188,7 +255,6 @@ async def upload_invoice(file: UploadFile = File(...)):
     
     invoices_db.append(new_invoice)
     return new_invoice
-
 
 
 @app.post("/approve")

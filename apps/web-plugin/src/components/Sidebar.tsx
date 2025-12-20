@@ -21,7 +21,7 @@ export function Sidebar({ selectedId, onSelect }: Props) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: invoices, isLoading } = useQuery({
+  const { data: invoices } = useQuery({
     queryKey: ["invoices"],
     queryFn: api.getInvoices,
   });
@@ -40,7 +40,6 @@ export function Sidebar({ selectedId, onSelect }: Props) {
     if (file) uploadMutation.mutate(file);
   };
 
-  // --- FILTERING LOGIC ---
   const filteredInvoices = invoices?.filter((inv) => {
     if (activeTab === "queue")
       return inv.status === "queue" || inv.status === "review";

@@ -1,6 +1,19 @@
 // packages/shared/index.ts
 
 export type ReceiptStatus = "queue" | "review" | "approved" | "rejected";
+export type DocumentCategory = "bill" | "invoice" | "bank_statement" | "misc";
+
+// NEW
+export interface BankTransaction {
+  date: string;
+  description: string;
+  amount: number;
+}
+export interface BankStatementData {
+  openingBalance: number;
+  closingBalance: number;
+  transactions: BankTransaction[];
+}
 
 // 1. The Detailed Checklist (UAE VAT Requirements)
 export interface ComplianceChecklist {
@@ -30,7 +43,8 @@ export interface Invoice {
   invoiceNumber: string | null;
   status: ReceiptStatus;
   imageUrl: string;
-
+  category: DocumentCategory;
+  bankStatementData?: BankStatementData;
   compliance: {
     isCompliant: boolean;
     missingFields: string[];
@@ -67,6 +81,7 @@ export const MOCK_INVOICES: Invoice[] = [
     invoiceNumber: "INV-SB-99",
     status: "queue",
     imageUrl: "https://via.placeholder.com/300?text=Starbucks",
+    category: "bill",
     compliance: {
       isCompliant: true,
       missingFields: [],
@@ -83,6 +98,7 @@ export const MOCK_INVOICES: Invoice[] = [
     invoiceNumber: null,
     status: "review",
     imageUrl: "https://via.placeholder.com/300?text=Bad+Invoice",
+    category: "bill",
     compliance: {
       isCompliant: false,
       missingFields: ["Missing Tax Invoice Header", "Missing Supplier TRN"],

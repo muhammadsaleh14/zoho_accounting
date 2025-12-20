@@ -10,7 +10,7 @@ export default defineConfig({
   },
   base: "/zoho_accounting/", // <--- ADD THIS LINE (Makes paths relative, e.g. "./script.js")
   build: {
-    outDir: "../../../widgets/Receipt_Review/app",
+    outDir: "E:/project/receipt-monorepo/apps/web-plugin/dist",
     emptyOutDir: true,
   },
 });

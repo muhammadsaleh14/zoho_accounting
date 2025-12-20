@@ -6,18 +6,34 @@ import {
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
-import { Camera, RefreshCw, Plus, Home, Settings } from "lucide-react";
-import { api } from "./services/api";
+import { RefreshCw, Plus, Home, Settings, Upload, Folder, Landmark, FileText, Receipt } from "lucide-react";
+import { api, API_BASE } from "./services/api";
 import { ReceiptCard } from "./components/ReceiptCard";
+import { CategoryPicker } from "./components/CategoryPicker";
+import type { DocumentCategory } from "@receipt-app/shared";
+import { ExpenseChart } from "./components/ExpenseChart";
+import { ReportCard } from "./components/ReportCard";
+import { StatsGrid } from "./components/StatsGrid";
+import { FolderGrid } from "./components/FolderGrid";
+import { FolderView } from "./components/FolderView";
 
 const queryClient = new QueryClient();
 
 function MobileWallet() {
   const client = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [activeTab, setActiveTab] = useState("home");
 
-  // Fetch Data
+  // State
+  const [activeTab, setActiveTab] = useState("home");
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] =
+    useState<DocumentCategory>("bill");
+  const [viewMode, setViewMode] = useState<"input" | "output">("input");
+  const [currentFolder, setCurrentFolder] = useState<
+    DocumentCategory | "all" | null
+  >(null);
+
+  // 1. Fetch Data
   const {
     data: invoices,
     isLoading,
@@ -25,24 +41,126 @@ function MobileWallet() {
   } = useQuery({
     queryKey: ["invoices"],
     queryFn: api.getInvoices,
-    refetchInterval: 5000, // Auto-refresh every 5s to see approval updates
   });
 
-  // Upload Logic
+  // 2. Upload Logic
   const uploadMutation = useMutation({
-    mutationFn: api.uploadReceipt,
+    mutationFn: (vars: { file: File; category: DocumentCategory }) =>
+      api.uploadReceipt(vars.file, vars.category),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["invoices"] });
     },
   });
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) {
-      uploadMutation.mutate(e.target.files[0]);
+  const folderData = [
+    {
+      id: "bill",
+      label: "Bills & Expenses",
+      icon: Receipt,
+      count: invoices?.filter((i) => i.category === "bill").length || 0,
+    },
+    {
+      id: "invoice",
+      label: "Sales Invoices",
+      icon: FileText,
+      count: invoices?.filter((i) => i.category === "invoice").length || 0,
+    },
+    {
+      id: "bank_statement",
+      label: "Bank Statements",
+      icon: Landmark,
+      count:
+        invoices?.filter((i) => i.category === "bank_statement").length || 0,
+    },
+    {
+      id: "misc",
+      label: "Miscellaneous",
+      icon: Folder,
+      count: invoices?.filter((i) => i.category === "misc").length || 0,
+    },
+  ];
+
+  const invoicesInCurrentFolder = invoices?.filter((inv) => {
+    if (currentFolder === "all") return true;
+    return inv.category === currentFolder;
+  });
+
+  const currentFolderName =
+    folderData.find((f) => f.id === currentFolder)?.label || "All Documents";
+
+  const MOCK_REPORTS = [
+    {
+      id: 1,
+      title: "Profit & Loss - Nov 2025",
+      date: "2025-12-01",
+      url: `${API_BASE}/images/report.pdf`,
+    },
+    {
+      id: 2,
+      title: "Balance Sheet - Q3",
+      date: "2025-10-01",
+      url: `${API_BASE}/images/report.pdf`,
+    },
+    {
+      id: 3,
+      title: "VAT Return Filing",
+      date: "2025-09-15",
+      url: `${API_BASE}/images/report.pdf`,
+    },
+  ];
+
+  const groupedReports = MOCK_REPORTS.reduce(
+    (acc, report) => {
+      // Get month name (e.g., "December 2025")
+      const monthYear = new Date(report.date).toLocaleString("default", {
+        month: "long",
+        year: "numeric",
+      });
+
+      // Create group if it doesn't exist
+      if (!acc[monthYear]) {
+        acc[monthYear] = [];
+      }
+
+      acc[monthYear].push(report);
+      return acc;
+    },
+    {} as Record<string, typeof MOCK_REPORTS>
+  );
+
+  // Step A: User picks category -> Open File Dialog
+  const handleCategorySelect = (category: DocumentCategory) => {
+    setSelectedCategory(category);
+    setIsPickerOpen(false); // Close the sheet
+
+    if (fileInputRef.current) {
+      // Validation: Bank Statements must be PDF
+      if (category === "bank_statement") {
+        fileInputRef.current.accept = "application/pdf";
+      } else {
+        // Others can be Image or PDF
+        fileInputRef.current.accept = "image/*,application/pdf";
+      }
+
+      // Trigger the hidden input
+      // Note: On mobile, this opens Camera or File Picker
+      fileInputRef.current.click();
     }
   };
 
-  // Stats Calculation
+  // Step B: User picks file -> Upload
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) {
+      uploadMutation.mutate({
+        file: e.target.files[0],
+        category: selectedCategory,
+      });
+    }
+    // Reset value so same file can be selected again if needed
+    e.target.value = "";
+  };
+
+  // Stats
   const totalSpent =
     invoices?.reduce((sum, inv) => sum + (inv.amount || 0), 0) || 0;
   const pendingCount =
@@ -51,88 +169,146 @@ function MobileWallet() {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 font-sans text-gray-900">
-      {/* 1. HEADER & STATS */}
-      <div className="bg-[#0f172a] text-white pt-12 pb-24 px-6 rounded-b-[40px] shadow-xl relative z-0">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-              Total Expenses
-            </p>
-            <h1 className="text-3xl font-bold mt-1">
-              ${totalSpent.toLocaleString()}
-            </h1>
-          </div>
-          <div className="bg-slate-800 p-2 rounded-full">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-400 to-purple-500"></div>
-          </div>
-        </div>
-      </div>
+      {/* --- SCROLLABLE CONTENT AREA --- */}
+      {/* Everything here scrolls together */}
+      <div className="flex-1 overflow-y-auto no-scrollbar">
+        {/* 1. HEADER & STATS (Now part of the scroll view) */}
+        <div className="bg-[#0f172a] text-white pt-12 pb-24 px-6 rounded-b-[40px] shadow-xl relative z-0 overflow-hidden">
+          <div className="flex justify-between items-start mb-2 relative z-10">
+            <div>
+              <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+                Live Cash Flow
+              </p>
+              <h1 className="text-3xl font-bold mt-1">
+                ${totalSpent.toLocaleString()}
+              </h1>
+              <p className="text-slate-500 text-xs mt-1">+12% vs last month</p>
+            </div>
 
-      {/* 2. FLOATING ACTION CARD (Overlap) */}
-      <div className="px-6 -mt-12 relative z-10">
-        <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100 flex justify-between items-center">
-          <div>
-            <p className="text-sm font-bold text-gray-700">Pending Review</p>
-            <p className="text-xs text-gray-500">
-              Requires accountant approval
-            </p>
-          </div>
-          <div className="bg-amber-100 text-amber-700 font-bold px-3 py-1 rounded-full text-sm">
-            {pendingCount}
-          </div>
-        </div>
-      </div>
-
-      {/* 3. SCROLLABLE LIST */}
-      <div className="flex-1 overflow-y-auto px-6 pt-6 pb-32">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="font-bold text-lg text-gray-800">Recent Activity</h2>
-          {isLoading && (
-            <RefreshCw className="w-4 h-4 text-gray-400 animate-spin" />
-          )}
-        </div>
-
-        {isError && (
-          <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm text-center mb-4 border border-red-100">
-            ⚠️ Cannot connect to server.
-            <br />
-            Check IP configuration.
-          </div>
-        )}
-
-        <div className="space-y-1">
-          {uploadMutation.isPending && (
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-blue-100 mb-3 animate-pulse">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-xl"></div>
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-blue-100 rounded w-1/2"></div>
-                  <div className="h-3 bg-blue-50 rounded w-1/3"></div>
-                </div>
-              </div>
-              <div className="mt-3 text-xs text-blue-600 font-bold text-center">
-                ✨ AI Analyzing Receipt...
+            <div className="bg-slate-800 p-2 rounded-full border border-slate-700">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-400 to-purple-500 flex items-center justify-center text-xs font-bold">
+                AC
               </div>
             </div>
-          )}
+          </div>
 
-          {invoices?.map((inv) => (
-            <ReceiptCard key={inv.id} invoice={inv} />
-          ))}
+          <div className="relative z-10 -ml-4 -mr-4">
+            <ExpenseChart />
+          </div>
 
-          {!isLoading && invoices?.length === 0 && (
-            <div className="text-center py-10 text-gray-400">
-              <p>No receipts yet.</p>
-              <p className="text-sm">Tap + to add one.</p>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+        </div>
+
+        {/* 2. FLOATING ACTION CARD */}
+        <div className="px-6 -mt-12 relative z-10 mb-6">
+          <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100 flex justify-between items-center">
+            <div>
+              <p className="text-sm font-bold text-gray-700">Pending Review</p>
+              <p className="text-xs text-gray-500">
+                Requires accountant approval
+              </p>
+            </div>
+            <div className="bg-amber-100 text-amber-700 font-bold px-3 py-1 rounded-full text-sm">
+              {pendingCount}
+            </div>
+          </div>
+        </div>
+
+        {/* 3. LIST CONTENT */}
+        <div className="px-6 pb-32">
+          {" "}
+          {/* Added pb-32 so list isn't hidden behind nav */}
+          <div className="mb-6">
+            <StatsGrid />
+          </div>
+          {/* View Toggle */}
+          <div className="bg-gray-200 p-1 rounded-xl flex mb-6">
+            <button
+              onClick={() => setViewMode("input")}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                viewMode === "input"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Receipts
+            </button>
+            <button
+              onClick={() => setViewMode("output")}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                viewMode === "output"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Reports
+            </button>
+          </div>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="font-bold text-lg text-gray-800">
+              {viewMode === "input" ? "Recent Uploads" : "Financial Reports"}
+            </h2>
+            {isLoading && viewMode === "input" && (
+              <RefreshCw className="w-4 h-4 text-gray-400 animate-spin" />
+            )}
+          </div>
+          {/* Error Message */}
+          {isError && (
+            <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm text-center mb-4 border border-red-100">
+              ⚠️ Cannot connect to server.
             </div>
           )}
+          <div className="space-y-1">
+            {/* VIEW: INPUT */}
+            {viewMode === "input" && (
+              <>
+                {/* If no folder is selected, show the Grid */}
+                {!currentFolder ? (
+                  <FolderGrid
+                    folders={folderData}
+                    onSelectFolder={setCurrentFolder}
+                  />
+                ) : (
+                  /* If a folder is selected, show the List View */
+                  <FolderView
+                    folderName={currentFolderName}
+                    invoices={invoicesInCurrentFolder || []}
+                    onBack={() => setCurrentFolder(null)}
+                  />
+                )}
+              </>
+            )}
+
+            {/* VIEW: OUTPUT */}
+            {viewMode === "output" && (
+              <div className="space-y-6">
+                {Object.entries(groupedReports).map(([monthYear, reports]) => (
+                  <div key={monthYear}>
+                    <h3 className="font-bold text-gray-400 text-xs uppercase tracking-wider pb-2 mb-2 border-b">
+                      {monthYear}
+                    </h3>
+                    <div className="space-y-2">
+                      {reports.map((report) => (
+                        <ReportCard
+                          key={report.id}
+                          title={report.title}
+                          date={report.date}
+                          url={report.url}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* 4. BOTTOM NAVIGATION & FAB */}
-      <div className="fixed bottom-0 w-full bg-white border-t border-gray-200 pb-safe pt-2 px-6 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+      {/* --- FIXED BOTTOM NAVIGATION --- */}
+      <div className="fixed bottom-0 w-full bg-white border-t border-gray-200 pb-safe pt-2 px-6 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20">
         <div className="flex justify-between items-end pb-4">
-          {/* Tab 1 */}
           <button
             onClick={() => setActiveTab("home")}
             className={`flex flex-col items-center gap-1 w-16 transition-colors ${activeTab === "home" ? "text-blue-600" : "text-gray-400"}`}
@@ -141,18 +317,17 @@ function MobileWallet() {
             <span className="text-[10px] font-bold">Home</span>
           </button>
 
-          {/* BIG FAB (Center) */}
           <div className="relative -top-6">
             <input
               type="file"
-              accept="image/*"
               capture="environment"
               ref={fileInputRef}
               className="hidden"
               onChange={handleFile}
             />
+
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => setIsPickerOpen(true)}
               disabled={uploadMutation.isPending}
               className="w-16 h-16 bg-blue-600 rounded-full shadow-xl shadow-blue-600/30 flex items-center justify-center text-white active:scale-95 transition-transform"
             >
@@ -160,7 +335,6 @@ function MobileWallet() {
             </button>
           </div>
 
-          {/* Tab 2 */}
           <button
             onClick={() => setActiveTab("settings")}
             className={`flex flex-col items-center gap-1 w-16 transition-colors ${activeTab === "settings" ? "text-blue-600" : "text-gray-400"}`}
@@ -173,6 +347,12 @@ function MobileWallet() {
           </button>
         </div>
       </div>
+
+      <CategoryPicker
+        isOpen={isPickerOpen}
+        onClose={() => setIsPickerOpen(false)}
+        onSelect={handleCategorySelect}
+      />
     </div>
   );
 }

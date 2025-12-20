@@ -1,5 +1,5 @@
 import type { Invoice } from "@receipt-app/shared";
-import { Clock, CheckCircle2, AlertTriangle, FileText } from "lucide-react";
+import { Clock, CheckCircle2, AlertTriangle } from "lucide-react";
 
 export function ReceiptCard({ invoice }: { invoice: Invoice }) {
   const isReview = invoice.status === "review";

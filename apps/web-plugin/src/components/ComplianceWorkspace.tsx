@@ -1,13 +1,21 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { Invoice } from "@receipt-app/shared";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../services/api";
 import { ComplianceChecklist } from "./ComplianceChecklist";
 import { Maximize2, Minimize2, Pin, PinOff, Trash2, Plus } from "lucide-react";
+import { NgrokImage } from "./NgrokImage";
+import { BankStatementView } from "./BankStatementView";
 
 interface Props {
   invoice: Invoice;
   onSuccess: () => void;
+}
+
+// Define Customer Interface locally or import if shared
+interface Customer {
+  contact_id: string;
+  contact_name: string;
 }
 
 export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
@@ -16,6 +24,7 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
   const queryClient = useQueryClient();
 
   // --- STATE ---
+  // Using explicit types or initial values to satisfy TS
   const [header, setHeader] = useState({
     vendor: invoice.vendor,
     billNumber: invoice.invoiceNumber || "",
@@ -23,7 +32,7 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
     billDate: invoice.date,
     dueDate: invoice.date,
     subject: "",
-    adjustment: 0,
+    adjustment: 0 as number | string, // Allow string for input handling
   });
 
   // Dynamic Line Items
@@ -37,34 +46,18 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
     },
   ]);
 
-  // Reset when invoice changes
-  useEffect(() => {
-    setHeader({
-      vendor: invoice.vendor,
-      billNumber: invoice.invoiceNumber || "",
-      orderNumber: "",
-      billDate: invoice.date,
-      dueDate: invoice.date,
-      subject: `Bill from ${invoice.vendor}`,
-      adjustment: 0,
-    });
-    setLines([
-      {
-        description: "Extracted Item",
-        accountId: "",
-        quantity: 1,
-        rate: invoice.amount,
-        customerId: "",
-      },
-    ]);
-  }, [invoice]);
+  // Initial State Hydration (Key-based reset handles the rest)
+  // We use useState initializer above, so useEffect is NOT needed here.
+  // The 'key={invoice.id}' in App.tsx handles the reset.
 
   // --- DATA FETCHING ---
   const { data: accounts } = useQuery({
     queryKey: ["accounts"],
     queryFn: api.getChartOfAccounts,
   });
-  const { data: customers } = useQuery({
+
+  // Typed query for customers
+  const { data: customers } = useQuery<Customer[]>({
     queryKey: ["customers"],
     queryFn: api.getCustomers,
   });
@@ -74,7 +67,14 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
     (sum, line) => sum + line.quantity * line.rate,
     0
   );
-  const total = subTotal + parseFloat((header.adjustment as any) || 0);
+
+  // Parse adjustment safely
+  const adjustmentVal =
+    typeof header.adjustment === "string"
+      ? parseFloat(header.adjustment) || 0
+      : header.adjustment;
+
+  const total = subTotal + adjustmentVal;
 
   // --- ACTIONS ---
   const updateLine = (index: number, field: string, value: any) => {
@@ -96,39 +96,58 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
     }
   };
 
- const approveMutation = useMutation({
-   mutationFn: api.approveInvoice,
-   onSuccess: (data) => {
-     if (data.status === "success") {
-       // Success Alert (Optional, maybe replace with a Toast later)
-       alert(
-         `✅ Bill Created in Zoho! ID: ${data.details?.bill?.bill_id || "Success"}`
-       );
-
-       // Refresh Data
-       queryClient.invalidateQueries({ queryKey: ["invoices"] });
-
-       // CLEAR THE SCREEN
-       onSuccess();
-     } else {
-       alert(`❌ Zoho Error: ${data.message}`);
-     }
-   },
- });
+  const approveMutation = useMutation({
+    mutationFn: api.approveInvoice,
+    onSuccess: (data) => {
+      if (data.status === "success") {
+        alert(
+          `✅ Bill Created in Zoho! ID: ${data.details?.bill?.bill_id || "Success"}`
+        );
+        queryClient.invalidateQueries({ queryKey: ["invoices"] });
+        console.log("image is being loaded from", invoice.imageUrl);
+        onSuccess();
+      } else {
+        alert(`❌ Zoho Error: ${data.message}`);
+      }
+    },
+  });
 
   const handleApprove = () => {
     if (!header.billNumber) return alert("Bill Number is required");
-    // Validate Accounts
     if (lines.some((l) => !l.accountId))
       return alert("All lines must have an Account selected");
 
     approveMutation.mutate({
       id: invoice.id,
-      ...header,
+      vendor: header.vendor,
+      billNumber: header.billNumber,
+      orderNumber: header.orderNumber,
+      billDate: header.billDate,
+      dueDate: header.dueDate,
+      subject: header.subject,
+      adjustment: adjustmentVal, // Ensure we send number
       amount: total,
       lineItems: lines,
     });
   };
+
+  // --- CONDITIONAL RENDER ---
+  // If it's a bank statement, show the new UI.
+  // Otherwise, show the old Bill form.
+  if (invoice.category === "bank_statement" && invoice.bankStatementData) {
+    return (
+      <div className="flex h-full w-full gap-4 relative">
+        <div className="flex-1 bg-gray-900 rounded-lg flex items-center justify-center p-4">
+          <p className="text-white">PDF Viewer Placeholder</p>
+        </div>
+        <div className="w-96 rounded-lg overflow-hidden border">
+          <BankStatementView data={invoice.bankStatementData} />
+        </div>
+      </div>
+    );
+  } else {
+    console.log(invoice, "is not bank statement");
+  }
 
   return (
     <div
@@ -142,18 +161,19 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
           <button
             onClick={() => setIsSticky(!isSticky)}
             className="bg-black/50 text-white p-2 rounded"
+            title={isSticky ? "Unpin Image" : "Pin Image"}
           >
-            <Pin size={16} />
+            {isSticky ? <PinOff size={16} /> : <Pin size={16} />}
           </button>
-          <button
+          {/* <button
             onClick={() => setIsFullscreen(true)}
             className="bg-black/50 text-white p-2 rounded"
           >
             <Maximize2 size={16} />
-          </button>
+          </button> */}
         </div>
         <div className="w-full h-full flex items-center justify-center p-4">
-          <img
+          <NgrokImage
             src={invoice.imageUrl}
             className="max-w-full max-h-full object-contain shadow-2xl"
           />
@@ -386,8 +406,8 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
 
       {/* LIGHTBOX */}
       {isFullscreen && (
-        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4">
-          <img
+        <div className="fixed inset-0 z-[100] ...">
+          <NgrokImage
             src={invoice.imageUrl}
             className="max-h-full max-w-full object-contain"
             onClick={(e) => e.stopPropagation()}

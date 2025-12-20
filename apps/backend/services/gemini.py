@@ -20,9 +20,9 @@ except Exception as e:
     print(f"Failed to initialize Gemini Client: {e}")
     client = None
 
-def analyze_receipt_with_gemini(file_bytes: bytes):
+def analyze_receipt_with_gemini(file_bytes: bytes, mime_type: str = "image/jpeg"): # <--- Added mime_type argument
     """
-    Sends image to Gemini 1.5 Flash using the new google-genai SDK.
+    Sends image or PDF to Gemini 1.5 Flash using the new google-genai SDK.
     """
     if not client:
         return {
@@ -30,6 +30,7 @@ def analyze_receipt_with_gemini(file_bytes: bytes):
             "missingFields": ["Server Error: AI Key Missing"],
             "confidenceScore": 0.0
         }
+
 
     prompt = """
     You are a strict UAE VAT Compliance Officer. Analyze this receipt image against the Federal Tax Authority requirements.
@@ -80,7 +81,6 @@ def analyze_receipt_with_gemini(file_bytes: bytes):
       "confidenceScore": float
     }
     """
- 
     try:
         # 4. Generate Content (New SDK Syntax)
         response = client.models.generate_content(
@@ -90,23 +90,20 @@ def analyze_receipt_with_gemini(file_bytes: bytes):
                     role="user",
                     parts=[
                         types.Part.from_text(text=prompt),
-                        types.Part.from_bytes(data=file_bytes, mime_type="image/jpeg"),
+                        # USE THE DYNAMIC MIME TYPE HERE:
+                        types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
                     ],
                 )
             ],
             config=types.GenerateContentConfig(
-                response_mime_type="application/json" # Force JSON mode
+                response_mime_type="application/json"
             ),
         )
 
-        # 5. Parse Response
-        # The new SDK returns a parsed object if response_mime_type is json, 
-        # or we access .text and parse it.
+        # ... (Keep existing parsing logic) ...
         try:
-            # Try to get the parsed structure directly if available, or parse text
             return json.loads(response.text)
         except json.JSONDecodeError:
-            # Fallback cleanup if the model adds markdown backticks
             raw_text = response.text.replace("```json", "").replace("```", "").strip()
             return json.loads(raw_text)
 
