@@ -1,1 +1,17 @@
 @import "tailwindcss";
+
+@layer components {
+  .zoho-label {
+    @apply block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide;
+  }
+  .zoho-input {
+    @apply w-full border border-gray-300 rounded px-3 py-2 text-sm text-gray-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none transition-all;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+  }
+  .scrollbar-hide {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+  }
+}
