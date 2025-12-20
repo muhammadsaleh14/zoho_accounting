@@ -1,0 +1,36 @@
+# --- DEPENDENCIES ---
+node_modules/
+.pnp
+.pnp.js
+apps/*/node_modules/
+packages/*/node_modules/
+
+# --- PYTHON (Backend) ---
+__pycache__/
+*.py[cod]
+*$py.class
+apps/backend/venv/
+apps/backend/.venv/
+apps/backend/uploads/   
+apps/backend/.env       
+
+# --- REACT / VITE (Web Plugin) ---
+apps/web-plugin/dist/
+apps/web-plugin/build/
+apps/web-plugin/.env.local
+
+# --- EXPO / REACT NATIVE (Mobile) ---
+apps/mobile/.expo/
+apps/mobile/dist/
+apps/mobile/web-build/
+apps/mobile/*.apk
+apps/mobile/*.aab
+
+# --- SYSTEM & IDE ---
+.DS_Store
+.vscode/
+.idea/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
