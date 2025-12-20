@@ -64,6 +64,8 @@ function App() {
               <ComplianceWorkspace
                 key={selectedInvoice.id}
                 invoice={selectedInvoice}
+                // NEW: Pass a callback to clear selection
+                onSuccess={() => setSelectedInvoice(null)}
               />
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-slate-300">

@@ -1,1 +1,13 @@
 @import "tailwindcss";
+
+
+body {
+    background-color: #f8fafc;
+    /* Prevent rubber-banding on iOS */
+    overscroll-behavior-y: none; 
+}
+
+/* Hide scrollbar for clean look */
+::-webkit-scrollbar {
+    display: none;
+}

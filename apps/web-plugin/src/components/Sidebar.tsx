@@ -1,7 +1,15 @@
-import type { Invoice } from '@receipt-app/shared';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../services/api';
-import { useRef } from 'react';
+import { useState } from "react";
+import type { Invoice } from "@receipt-app/shared";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "../services/api";
+import { useRef } from "react";
+import {
+  LayoutList,
+  History,
+  UploadCloud,
+  AlertCircle,
+  CheckCircle2,
+} from "lucide-react";
 
 interface Props {
   selectedId: string | null;
@@ -9,101 +17,122 @@ interface Props {
 }
 
 export function Sidebar({ selectedId, onSelect }: Props) {
+  const [activeTab, setActiveTab] = useState<"queue" | "history">("queue");
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 1. Fetch List
   const { data: invoices, isLoading } = useQuery({
-    queryKey: ['invoices'],
+    queryKey: ["invoices"],
     queryFn: api.getInvoices,
   });
 
-  // 2. Upload Mutation
   const uploadMutation = useMutation({
     mutationFn: api.uploadReceipt,
     onSuccess: (newInvoice) => {
-      // Refresh the list automatically
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      // Auto-select the new item
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      setActiveTab("queue"); // Switch to queue to see new item
       onSelect(newInvoice);
     },
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      uploadMutation.mutate(file);
-    }
+    if (file) uploadMutation.mutate(file);
   };
 
-  return (
-    <aside className="w-80 bg-white border-r border-gray-200 flex flex-col h-full flex-shrink-0">
-      
-      {/* Header with Upload */}
-      <div className="p-4 border-b border-gray-200 bg-gray-50 space-y-3">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-            Incoming Queue
-          </h2>
-          {/* Status Indicators */}
-          {isLoading && <span className="text-xs text-blue-500">Syncing...</span>}
-          {uploadMutation.isPending && <span className="text-xs text-purple-600 font-bold animate-pulse">AI Processing...</span>}
-        </div>
+  // --- FILTERING LOGIC ---
+  const filteredInvoices = invoices?.filter((inv) => {
+    if (activeTab === "queue")
+      return inv.status === "queue" || inv.status === "review";
+    if (activeTab === "history")
+      return inv.status === "approved" || inv.status === "rejected";
+    return false;
+  });
 
-        {/* Upload Button */}
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          className="hidden" 
+  return (
+    <aside className="w-80 bg-white border-r border-slate-200 flex flex-col h-full flex-shrink-0">
+      {/* Upload Header */}
+      <div className="p-4 border-b border-slate-100 bg-slate-50 space-y-3">
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
           accept="image/*,.pdf"
           onChange={handleFileChange}
         />
-        <button 
+        <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploadMutation.isPending}
-          className="w-full py-2 px-3 bg-white border border-gray-300 rounded text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-blue-400 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          className="w-full py-2.5 px-3 bg-slate-900 text-white rounded-md text-sm font-semibold hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-sm"
         >
-          <span>☁️</span> 
-          {uploadMutation.isPending ? 'Scanning Receipt...' : 'Upload Receipt'}
+          <UploadCloud size={16} />
+          {uploadMutation.isPending ? "Scanning..." : "Upload Receipt"}
         </button>
       </div>
 
-      {/* List Content */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Optimistic / Loading State for Upload */}
-        {uploadMutation.isPending && (
-          <div className="p-4 border-b border-purple-100 bg-purple-50 animate-pulse">
-            <div className="h-4 bg-purple-200 rounded w-1/2 mb-2"></div>
-            <div className="h-3 bg-purple-200 rounded w-3/4"></div>
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200">
+        <button
+          onClick={() => setActiveTab("queue")}
+          className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 border-b-2 transition-colors ${
+            activeTab === "queue"
+              ? "border-blue-500 text-blue-600 bg-blue-50/50"
+              : "border-transparent text-slate-500 hover:bg-slate-50"
+          }`}
+        >
+          <LayoutList size={14} /> Queue
+        </button>
+        <button
+          onClick={() => setActiveTab("history")}
+          className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 border-b-2 transition-colors ${
+            activeTab === "history"
+              ? "border-blue-500 text-blue-600 bg-blue-50/50"
+              : "border-transparent text-slate-500 hover:bg-slate-50"
+          }`}
+        >
+          <History size={14} /> History
+        </button>
+      </div>
+
+      {/* List */}
+      <div className="flex-1 overflow-y-auto bg-white">
+        {/* Empty State */}
+        {filteredInvoices?.length === 0 && (
+          <div className="p-8 text-center text-slate-400">
+            <p className="text-sm">No receipts in {activeTab}</p>
           </div>
         )}
 
-        {invoices?.map((invoice) => (
+        {filteredInvoices?.map((invoice) => (
           <div
             key={invoice.id}
             onClick={() => onSelect(invoice)}
             className={`
-              p-4 border-b border-gray-100 cursor-pointer transition-colors duration-150
-              ${selectedId === invoice.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'hover:bg-gray-50 border-l-4 border-l-transparent'}
+              p-4 border-b border-slate-50 cursor-pointer transition-all duration-150 group
+              ${selectedId === invoice.id ? "bg-blue-50 border-l-4 border-l-blue-500" : "hover:bg-slate-50 border-l-4 border-l-transparent"}
             `}
           >
             <div className="flex justify-between items-start mb-1">
-              <span className="font-semibold text-gray-800 text-sm">
+              <span
+                className={`font-semibold text-sm truncate pr-2 ${selectedId === invoice.id ? "text-blue-900" : "text-slate-700"}`}
+              >
                 {invoice.vendor}
               </span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                invoice.status === 'review' 
-                  ? 'bg-red-100 text-red-600' 
-                  : 'bg-green-100 text-green-600'
-              }`}>
-                {invoice.status}
-              </span>
+              {/* Status Icon */}
+              {invoice.status === "review" && (
+                <AlertCircle size={14} className="text-red-500" />
+              )}
+              {invoice.status === "approved" && (
+                <CheckCircle2 size={14} className="text-green-500" />
+              )}
             </div>
-            
-            <div className="flex justify-between text-xs text-gray-500 mt-2">
+
+            <div className="flex justify-between text-xs text-slate-500 mt-1.5">
               <span>{invoice.date}</span>
-              <span className="font-mono font-medium text-gray-700">
-                ${invoice.amount.toFixed(2)}
+              <span
+                className={`font-mono font-medium ${selectedId === invoice.id ? "text-blue-700" : "text-slate-600"}`}
+              >
+                {invoice.currency} {invoice.amount.toFixed(2)}
               </span>
             </div>
           </div>

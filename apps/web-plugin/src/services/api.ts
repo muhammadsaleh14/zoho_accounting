@@ -2,7 +2,7 @@ import axios from "axios";
 import type { Invoice } from "@receipt-app/shared";
 
 // 1. Configuration: Localhost Backend
-const API_URL = "http://localhost:8000";
+const API_URL = "https://polemoniaceous-disclamatory-brett.ngrok-free.dev/";
 
 // 2. TypeScript Definitions for Zoho SDK (UPDATED)
 
@@ -35,15 +35,17 @@ export const api = {
     return response.data;
   },
 
-  approveInvoice: async (data: {
-    id: string;
-    vendor: string;
-    date: string;
-    amount: number;
-    invoiceNumber: string;
-    accountId: string;
-  }) => {
-    // We always use Axios here because the Backend handles the Zoho Connection
+  getCustomers: async () => {
+    try {
+      const response = await axios.get(`${API_URL}/customers`);
+      return response.data;
+    } catch (err) {
+      return []; // Fallback
+    }
+  },
+
+  approveInvoice: async (data: any) => {
+    // Allow 'any' or define complex type
     const response = await axios.post(`${API_URL}/approve`, data);
     return response.data;
   },

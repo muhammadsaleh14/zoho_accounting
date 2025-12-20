@@ -1,6 +1,9 @@
 from fastapi import FastAPI, UploadFile, File
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from httpx import Request
 from pydantic import BaseModel
 from typing import List, Optional
 import time
@@ -8,10 +11,25 @@ import shutil
 import os
 from dotenv import load_dotenv
 from services.gemini import analyze_receipt_with_gemini
-from services.zoho import create_bill_in_zoho, fetch_chart_of_accounts # <--- Added
+from services.zoho import create_bill_in_zoho, fetch_chart_of_accounts, fetch_customers # <--- Added
 
 load_dotenv()
 app = FastAPI()
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # Get the raw body to see what the frontend actually sent
+    body = await request.body()
+    print(f"\n❌ 422 VALIDATION ERROR:")
+    print(f"URL: {request.url}")
+    print(f"Body Received: {body.decode('utf-8')}")
+    print(f"Missing/Wrong Fields: {exc.errors()}\n")
+    
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": body.decode('utf-8')},
+    )
 
 # --- CONFIGURATION ---
 # UPDATE THIS WITH YOUR CURRENT NGROK URL
@@ -63,6 +81,35 @@ class Invoice(BaseModel):
     status: str
     imageUrl: str
     compliance: ComplianceResult
+    
+# --- NEW DATA MODELS ---
+class LineItem(BaseModel):
+    description: str
+    accountId: str
+    quantity: float
+    rate: float
+    # Optional because user might select "None"
+    customerId: Optional[str] = "" 
+
+class ApproveRequest(BaseModel):
+    id: str
+    vendor: str
+    
+    # MAPPING FIX: React sends 'billNumber', previous model expected 'invoiceNumber'
+    billNumber: str 
+    
+    # MAPPING FIX: React sends 'billDate', previous model expected 'date'
+    billDate: str   
+    
+    dueDate: str
+    orderNumber: Optional[str] = ""
+    subject: Optional[str] = ""
+    
+    # React sends adjustment as string or number depending on input, force float
+    adjustment: float 
+    
+    amount: float
+    lineItems: List[LineItem]
 
 # --- 4. IN-MEMORY DB ---
 invoices_db = [] 
@@ -72,6 +119,10 @@ invoices_db = []
 @app.get("/")
 def read_root():
     return {"status": "Backend is running"}
+
+@app.get("/customers")
+async def get_customers():
+    return await fetch_customers()
 
 @app.get("/invoices", response_model=List[Invoice])
 def get_invoices():
@@ -138,30 +189,40 @@ async def upload_invoice(file: UploadFile = File(...)):
     invoices_db.append(new_invoice)
     return new_invoice
 
-# Add this Model
-class ApproveRequest(BaseModel):
-    id: str
-    vendor: str
-    date: str
-    amount: float
-    invoiceNumber: str
-    accountId: str
+
 
 @app.post("/approve")
 async def approve_invoice_endpoint(data: ApproveRequest):
-    print(f"Approving Invoice: {data.invoiceNumber}")
-    
-    # 1. Send to Zoho
-    zoho_response = await create_bill_in_zoho(data.dict())
+    # 1. Find the local file path from our database
+    local_path = None
+    for inv in invoices_db:
+        if inv["id"] == data.id:
+            filename = inv["imageUrl"].split("/images/")[-1]
+            local_path = f"uploads/{filename}"
+            break
+            
+    zoho_response = await create_bill_in_zoho(data.dict(), local_image_path=local_path)
     
     print("Zoho Response:", zoho_response)
     
     if zoho_response.get("code") == 0:
-        # Success! Update local DB status
-        # (Find item in invoices_db and update status to 'approved')
+        # 2. SUCCESS: Update the Local Database with the EDITED values
         for inv in invoices_db:
             if inv["id"] == data.id:
+                # Update Status
                 inv["status"] = "approved"
+                
+                # --- NEW: SAVE USER EDITS ---
+                # This ensures the History tab shows what the user actually typed,
+                # not what the AI originally guessed.
+                inv["vendor"] = data.vendor
+                inv["amount"] = data.amount
+                inv["date"] = data.billDate      # Map 'billDate' to 'date'
+                inv["invoiceNumber"] = data.billNumber # Map 'billNumber' to 'invoiceNumber'
+                
+                # We can also store the Zoho Bill ID if we want to link to it later
+                inv["zohoBillId"] = zoho_response["bill"]["bill_id"]
+                break
         
         return {"status": "success", "message": "Bill Created", "details": zoho_response}
     else:
