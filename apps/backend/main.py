@@ -86,7 +86,7 @@ class BankStatementData(BaseModel):
 class Invoice(BaseModel):
     id: str
     vendor: str
-    date: str
+    date: str = "Unknown Date"
     amount: float
     currency: str
     invoiceNumber: Optional[str] = None
@@ -232,17 +232,19 @@ async def upload_invoice(
     }
     # ----------------------
     # 4. Create Invoice Object
+    # 4. Create Invoice Object
     new_invoice = {
         "id": str(int(time.time())),
-        "vendor": ai_result.get("vendor", "Unknown"),
-        "date": ai_result.get("date", "2025-01-01"),
-        "amount": ai_result.get("amount", 0.0),
-        "currency": ai_result.get("currency", "AED"),
+        # Use 'or' to catch None/null values from the AI
+        "vendor": ai_result.get("vendor") or "Unknown Vendor",
+        "date": ai_result.get("date") or "2025-01-01",
+        "amount": ai_result.get("amount") or 0.0,
+        "currency": ai_result.get("currency") or "AED",
+        
         "invoiceNumber": ai_result.get("invoice_number"),
         "status": "review" if not ai_result.get("isCompliant") else "queue",
         "imageUrl": f"{BASE_URL}/images/{filename}",
         
-        # NEW: Save the category
         "category": category, 
         
         "compliance": {

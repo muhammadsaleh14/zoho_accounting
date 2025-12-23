@@ -6,7 +6,7 @@ import {
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
-import { RefreshCw, Plus, Home, Settings, Upload, Folder, Landmark, FileText, Receipt } from "lucide-react";
+import { RefreshCw, Plus, Home, Settings, Upload, Folder, Landmark, FileText, Receipt, Loader2 } from "lucide-react";
 import { api, API_BASE } from "./services/api";
 import { ReceiptCard } from "./components/ReceiptCard";
 import { CategoryPicker } from "./components/CategoryPicker";
@@ -353,6 +353,27 @@ function MobileWallet() {
         onClose={() => setIsPickerOpen(false)}
         onSelect={handleCategorySelect}
       />
+
+      {uploadMutation.isPending && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          {/* Backdrop with Blur */}
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+
+          {/* Loading Card */}
+          <div className="relative bg-white p-6 rounded-2xl shadow-2xl w-64 text-center animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Loader2 size={24} className="animate-spin" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-800 mb-1">
+              Analyzing...
+            </h3>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Extracting data with AI &<br />
+              checking compliance.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
