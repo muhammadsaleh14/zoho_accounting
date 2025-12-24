@@ -1,128 +1,148 @@
-// File: apps/web-plugin/src/services/api.ts
 import axios from "axios";
+import type { Invoice } from "@receipt-app/shared";
 
-// --- CONFIGURATION ---
-// This should be the address of your local FastAPI backend.
-const API_BASE = "http://localhost:8000";
+// 1. Configuration: Localhost Backend
+const API_URL = "http://localhost:8000";
+// const API_URL = "https://polemoniaceous-disclamatory-brett.ngrok-free.dev";
 
-// --- TYPES ---
-// We define the types here since we don't have the shared package.
-// These should match the schemas in your backend.
-export interface Invoice {
-  id: string;
-  vendor: string;
-  date: string;
-  amount: number;
-  currency: string;
-  status: "review" | "approved" | "synced";
-  category: "bill" | "invoice" | "bank_statement";
-  imageUrl: string;
-  compliance: any;
-  line_items?: any[];
-  bankStatementData?: any;
-  invoiceNumber?: string;
-}
 
-export interface ExtractedData extends Invoice {
-  // It can have more fields from the AI
-}
+// 2. TypeScript Definitions for Zoho SDK (UPDATED)
 
-// --- API SERVICE MAPPED TO YOUR BACKEND ---
+// Helper to get params from the iframe URL
+// const getQueryParam = (param: string) => {
+//   const urlParams = new URLSearchParams(window.location.search);
+//   return urlParams.get(param);
+// };
+
 export const api = {
-  // Your backend doesn't have an endpoint to GET all documents yet.
-  // So, we use DUMMY DATA here to make the UI work.
+  // Fetch the list (GET /invoices)
   getInvoices: async (): Promise<Invoice[]> => {
-    console.warn(
-      "Using dummy data for getInvoices. Create a GET endpoint in your backend to see real data."
-    );
-    return [
-      {
-        id: "doc1",
-        vendor: "Starbucks",
-        date: "2025-12-25",
-        amount: 15.75,
-        currency: "AED",
-        status: "review",
-        category: "bill",
-        imageUrl: `/images/dummy.jpg`,
-        compliance: { checklist: {} },
+    // Note: We use direct Axios for invoices because your backend is Localhost
+    // and we enabled CORS in FastAPI.
+    const response = await axios.get(`${API_URL}/invoices`, {
+      headers: {
+        // Option 1: ngrok skip browser warning header
+        "ngrok-skip-browser-warning": "true",
+
+        // Option 2 (optional): custom User-Agent (if you want to use this)
+        // 'User-Agent': 'MyCustomAgent/1.0',
       },
-      {
-        id: "doc2",
-        vendor: "Amazon Web Services",
-        date: "2025-12-24",
-        amount: 150.0,
-        currency: "USD",
-        status: "approved",
-        category: "bill",
-        imageUrl: `/images/dummy.jpg`,
-        compliance: { checklist: {} },
-      },
-      {
-        id: "doc3",
-        vendor: "Client Project Alpha",
-        date: "2025-12-22",
-        amount: 5000.0,
-        currency: "AED",
-        status: "invoice",
-        imageUrl: `/images/dummy.jpg`,
-        compliance: { checklist: {} },
-      },
-    ];
+    });
+    console.log("Fetched invoices:", response.data);
+    return response.data;
   },
 
-  // This maps directly to your backend's upload endpoint.
-  uploadReceipt: async (
-    file: File,
-    category: string
-  ): Promise<ExtractedData> => {
+  // Upload a file (POST /upload)
+  uploadReceipt: async (file: File, category: string = "invoice"): Promise<Invoice> => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("category", category);
 
-    const response = await axios.post(
-      `${API_BASE}/api/v1/documents/upload`,
-      formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      }
-    );
+    const response = await axios.post(`${API_URL}/upload`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        "ngrok-skip-browser-warning": "true",
+      },
+    });
+
+    console.log("Upload response:", response.data);
     return response.data;
   },
 
-  // This maps directly to your backend's accounts endpoint for dropdowns.
-  getChartOfAccounts: async (): Promise<
-    { account_id: string; account_name: string }[]
-  > => {
+  getCustomers: async () => {
     try {
-      const response = await axios.get(
-        `${API_BASE}/api/v1/accounting/accounts`
-      );
+      const response = await axios.get(`${API_URL}/customers`, {
+        headers: {
+          // Option 1: ngrok skip browser warning header
+          "ngrok-skip-browser-warning": "true",
+
+          // Option 2 (optional): custom User-Agent (if you want to use this)
+          // 'User-Agent': 'MyCustomAgent/1.0',
+        },
+      });
       return response.data;
     } catch (err) {
-      console.error("Failed to fetch accounts from backend", err);
+      return []; // Fallback
+    }
+  },
+
+  getNotifications: async (): Promise<any[]> => {
+    try {
+      const response = await axios.get(`${API_URL}/notifications`, {
+        headers: { "ngrok-skip-browser-warning": "true" },
+      });
+      return response.data;
+    } catch (err) {
+      console.error("Failed to fetch notifications");
       return [];
     }
   },
 
-  // This maps to your backend's bill approval endpoint.
-  approveInvoice: async (payload: any) => {
-    const response = await axios.post(
-      `${API_BASE}/api/v1/accounting/approve`,
-      payload
-    );
+  approveInvoice: async (data: any) => {
+    // Allow 'any' or define complex type
+    const response = await axios.post(`${API_URL}/approve`, data, {
+      headers: {
+        // Option 1: ngrok skip browser warning header
+        "ngrok-skip-browser-warning": "true",
+
+        // Option 2 (optional): custom User-Agent (if you want to use this)
+        // 'User-Agent': 'MyCustomAgent/1.0',
+      },
+    });
     return response.data;
   },
 
-  // Your backend does not have a GET /customers endpoint.
-  // We provide DUMMY DATA so the UI doesn't crash.
-  getCustomers: async (): Promise<
-    { contact_id: string; contact_name: string }[]
+  getChartOfAccounts: async (): Promise<
+    { account_id: string; account_name: string }[]
   > => {
-    console.warn("Using dummy data for getCustomers.");
-    return [
-      { contact_id: "cust_1", contact_name: "Global Tech Inc." },
-      { contact_id: "cust_2", contact_name: "Innovate Solutions" },
-    ];
+    try {
+      // Calls your FastAPI backend, which handles the Zoho Auth
+      const response = await axios.get(`${API_URL}/accounts`, {
+        headers: {
+          // Option 1: ngrok skip browser warning header
+          "ngrok-skip-browser-warning": "true",
+
+          // Option 2 (optional): custom User-Agent (if you want to use this)
+          // 'User-Agent': 'MyCustomAgent/1.0',
+        },
+      });
+      return response.data;
+    } catch (err) {
+      console.error("Failed to fetch accounts via Backend", err);
+      // Fail gracefully
+      return [];
+    }
   },
+
+  // // Get Accounts (Dropdown)
+  // getChartOfAccounts: async (): Promise<
+  //   { account_id: string; account_name: string }[]
+  // > => {
+  //   // Logic: If inside Zoho, ask Zoho for real accounts.
+  //   // If testing on localhost browser, return fake accounts.
+  //   if (isZoho()) {
+  //     try {
+  //       // Initialize might be needed depending on SDK version, safe to await
+  //       await window.ZFAPPS.extension.init();
+
+  //       const response = await window.ZFAPPS.get("chartofaccounts");
+  //       // Zoho returns object like { chartofaccounts: [...] }
+  //       console.log("Fetched accounts from Zoho:", response.data);
+  //       return response.chartofaccounts || [];
+  //     } catch (err) {
+  //       console.error("Failed to fetch accounts from Zoho", err);
+  //       return [];
+  //     }
+  //   } else {
+  //     // LOCAL MOCK DATA (For Demo/Testing outside iframe)
+  //     console.log("Using Mock Accounts (Localhost)");
+  //     return [
+  //       { account_id: "1", account_name: "Cost of Goods Sold" },
+  //       { account_id: "2", account_name: "Advertising & Marketing" },
+  //       { account_id: "3", account_name: "Meals and Entertainment" },
+  //       { account_id: "4", account_name: "Office Supplies" },
+  //       { account_id: "5", account_name: "Travel Expense" },
+  //     ];
+  //   }
+  // },
 };

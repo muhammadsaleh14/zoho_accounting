@@ -1,15 +1,15 @@
-// File: apps/web-plugin/src/App.tsx
-import { useState } from "react";
-import { Header } from "./components/Header";
-import { DashboardPage } from "./pages/DashboardPage";
-import { ReviewPage } from "./pages/ReviewPage";
-import { SearchProvider } from "./context/SearchContext";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { Sidebar } from "./components/Sidebar";
-import { VaultPage } from "./pages/VaultPage";
-import { NotificationsPage } from "./pages/NotificationsPage";
-import { SettingsPage } from "./pages/SettingsPage";
-import { DocumentUpload } from "./components/DocumentUpload";
+import { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Header } from './components/Header';
+import { Sidebar } from './components/Sidebar';
+import { DashboardPage } from './pages/DashboardPage';
+import { ReviewPage } from './pages/ReviewPage';
+import { VaultPage } from './pages/VaultPage';
+import { NotificationsPage } from './pages/NotificationsPage';
+import { SettingsPage } from './pages/SettingsPage';
+import { CompliancePage } from './pages/CompliancePage';
+import { DocumentUpload } from './components/DocumentUpload';
+import { SearchProvider } from './context/SearchContext';
 
 function App() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -19,10 +19,8 @@ function App() {
     <SearchProvider>
       <BrowserRouter basename="/zoho_accounting/">
         <div className="flex h-screen bg-surface-100 font-sans text-slate-900 overflow-hidden relative">
-          <Sidebar
-            isOpen={isMobileMenuOpen}
-            onClose={() => setIsMobileMenuOpen(false)}
-          />
+
+          <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
 
           <div className="flex-1 flex flex-col min-w-0">
             <Header
@@ -38,6 +36,7 @@ function App() {
                 <Route path="/vault" element={<VaultPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/compliance" element={<CompliancePage />} />
 
                 {/* Fallback Route */}
                 <Route path="*" element={<Navigate to="/" replace />} />
@@ -53,6 +52,7 @@ function App() {
               </div>
             </div>
           )}
+
         </div>
       </BrowserRouter>
     </SearchProvider>

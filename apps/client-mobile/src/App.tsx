@@ -6,7 +6,7 @@ import {
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
-import { RefreshCw, Plus, Home, Settings, Upload, Folder, Landmark, FileText, Receipt, Loader2 } from "lucide-react";
+import { RefreshCw, Plus, Home, Settings, Upload, Folder, Landmark, FileText, Receipt, Loader2, Bell, ShieldCheck } from "lucide-react";
 import { api, API_BASE } from "./services/api";
 import { ReceiptCard } from "./components/ReceiptCard";
 import { CategoryPicker } from "./components/CategoryPicker";
@@ -16,6 +16,10 @@ import { ReportCard } from "./components/ReportCard";
 import { StatsGrid } from "./components/StatsGrid";
 import { FolderGrid } from "./components/FolderGrid";
 import { FolderView } from "./components/FolderView";
+import { SettingsPage } from "./pages/SettingsPage";
+import { ThemeProvider } from "./components/ThemeProvider";
+import { MobileNotificationDropdown } from "./components/MobileNotificationDropdown";
+
 
 const queryClient = new QueryClient();
 
@@ -26,6 +30,7 @@ function MobileWallet() {
   // State
   const [activeTab, setActiveTab] = useState("home");
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [selectedCategory, setSelectedCategory] =
     useState<DocumentCategory>("bill");
   const [viewMode, setViewMode] = useState<"input" | "output">("input");
@@ -54,26 +59,26 @@ function MobileWallet() {
 
   const folderData = [
     {
-      id: "bill",
+      id: "bill" as DocumentCategory,
       label: "Bills & Expenses",
       icon: Receipt,
       count: invoices?.filter((i) => i.category === "bill").length || 0,
     },
     {
-      id: "invoice",
+      id: "invoice" as DocumentCategory,
       label: "Sales Invoices",
       icon: FileText,
       count: invoices?.filter((i) => i.category === "invoice").length || 0,
     },
     {
-      id: "bank_statement",
+      id: "bank_statement" as DocumentCategory,
       label: "Bank Statements",
       icon: Landmark,
       count:
         invoices?.filter((i) => i.category === "bank_statement").length || 0,
     },
     {
-      id: "misc",
+      id: "misc" as DocumentCategory,
       label: "Miscellaneous",
       icon: Folder,
       count: invoices?.filter((i) => i.category === "misc").length || 0,
@@ -167,49 +172,73 @@ function MobileWallet() {
     invoices?.filter((i) => i.status === "queue" || i.status === "review")
       .length || 0;
 
-  return (
-    <div className="h-screen flex flex-col bg-gray-50 font-sans text-gray-900">
-      {/* --- SCROLLABLE CONTENT AREA --- */}
-      {/* Everything here scrolls together */}
-      <div className="flex-1 overflow-y-auto no-scrollbar">
-        {/* 1. HEADER & STATS (Now part of the scroll view) */}
-        <div className="bg-[#0f172a] text-white pt-12 pb-24 px-6 rounded-b-[40px] shadow-xl relative z-0 overflow-hidden">
-          <div className="flex justify-between items-start mb-2 relative z-10">
-            <div>
-              <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-                Live Cash Flow
-              </p>
-              <h1 className="text-3xl font-bold mt-1">
-                ${totalSpent.toLocaleString()}
-              </h1>
-              <p className="text-slate-500 text-xs mt-1">+12% vs last month</p>
-            </div>
+  // Render Content
+  const renderContent = () => {
+    if (activeTab === "settings") {
+      return <SettingsPage onBack={() => setActiveTab("home")} />;
+    }
+    return (
+      <div className="flex-1 overflow-y-auto no-scrollbar scroll-smooth bg-slate-50">
+        {/* 1. HEADER & STATS - Light Blue Gradient */}
+        <div className="bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 text-white pt-6 pb-24 px-6 rounded-b-[40px] shadow-xl relative z-0 overflow-hidden">
 
-            <div className="bg-slate-800 p-2 rounded-full border border-slate-700">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-400 to-purple-500 flex items-center justify-center text-xs font-bold">
-                AC
+          {/* Logo/Brand */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <div className="bg-white/20 backdrop-blur-sm p-2 rounded-xl border border-white/30">
+                <ShieldCheck size={20} className="text-white" />
+              </div>
+              <div>
+                <h1 className="text-lg font-black leading-none tracking-tight">Zoho<span className="text-blue-200">Vault</span></h1>
+                <p className="text-[8px] text-blue-200 font-bold tracking-[0.1em] uppercase mt-0.5 opacity-80">Mobile</p>
               </div>
             </div>
+
+            <div className="bg-white/20 backdrop-blur-sm p-1.5 rounded-full border border-white/30 flex gap-2">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className={`w-9 h-9 rounded-full flex items-center justify-center text-white transition-all ${showNotifications ? 'bg-white/40' : 'bg-white/10 hover:bg-white/30'}`}
+              >
+                <Bell size={18} />
+                {/* Badge */}
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+              </button>
+              <div className="w-9 h-9 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center text-xs font-bold text-white">
+                MA
+              </div>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="mb-2">
+            <p className="text-blue-100 text-xs font-semibold uppercase tracking-wider flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-300 animate-pulse"></span>
+              Live Cash Flow
+            </p>
+            <h1 className="text-3xl font-bold mt-1">
+              ${totalSpent.toLocaleString()}
+            </h1>
+            <p className="text-blue-200 text-xs mt-1">+12% vs last month</p>
           </div>
 
           <div className="relative z-10 -ml-4 -mr-4">
             <ExpenseChart />
           </div>
 
-          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+          <div className="absolute top-0 right-0 w-72 h-72 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-400/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/4 pointer-events-none"></div>
         </div>
 
         {/* 2. FLOATING ACTION CARD */}
-        <div className="px-6 -mt-12 relative z-10 mb-6">
-          <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100 flex justify-between items-center">
+        <div className="px-6 -mt-12 relative mb-6">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-lg border border-gray-100 dark:border-slate-700 flex justify-between items-center transition-colors">
             <div>
-              <p className="text-sm font-bold text-gray-700">Pending Review</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-sm font-bold text-gray-700 dark:text-gray-200">Pending Review</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 Requires accountant approval
               </p>
             </div>
-            <div className="bg-amber-100 text-amber-700 font-bold px-3 py-1 rounded-full text-sm">
+            <div className="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 font-bold px-3 py-1 rounded-full text-sm">
               {pendingCount}
             </div>
           </div>
@@ -217,60 +246,53 @@ function MobileWallet() {
 
         {/* 3. LIST CONTENT */}
         <div className="px-6 pb-32">
-          {" "}
-          {/* Added pb-32 so list isn't hidden behind nav */}
           <div className="mb-6">
             <StatsGrid />
           </div>
-          {/* View Toggle */}
-          <div className="bg-gray-200 p-1 rounded-xl flex mb-6">
+
+          <div className="bg-gray-200 dark:bg-slate-800 p-1 rounded-xl flex mb-6 transition-colors">
             <button
               onClick={() => setViewMode("input")}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                viewMode === "input"
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${viewMode === "input"
+                ? "bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                }`}
             >
               Receipts
             </button>
             <button
               onClick={() => setViewMode("output")}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                viewMode === "output"
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${viewMode === "output"
+                ? "bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                }`}
             >
               Reports
             </button>
           </div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="font-bold text-lg text-gray-800">
-              {viewMode === "input" ? "Recent Uploads" : "Financial Reports"}
-            </h2>
-            {isLoading && viewMode === "input" && (
-              <RefreshCw className="w-4 h-4 text-gray-400 animate-spin" />
-            )}
-          </div>
-          {/* Error Message */}
+
+          <h2 className="font-bold text-lg text-gray-800 dark:text-white mb-4 transition-colors">
+            {viewMode === "input" ? "Recent Uploads" : "Financial Reports"}
+          </h2>
+
+          {isLoading && viewMode === "input" && (
+            <div className="flex justify-center p-4"><RefreshCw className="w-5 h-5 text-gray-400 animate-spin" /></div>
+          )}
+
           {isError && (
-            <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm text-center mb-4 border border-red-100">
+            <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl text-sm text-center mb-4 border border-red-100 dark:border-red-800">
               ⚠️ Cannot connect to server.
             </div>
           )}
           <div className="space-y-1">
-            {/* VIEW: INPUT */}
             {viewMode === "input" && (
               <>
-                {/* If no folder is selected, show the Grid */}
                 {!currentFolder ? (
                   <FolderGrid
                     folders={folderData}
                     onSelectFolder={setCurrentFolder}
                   />
                 ) : (
-                  /* If a folder is selected, show the List View */
                   <FolderView
                     folderName={currentFolderName}
                     invoices={invoicesInCurrentFolder || []}
@@ -280,12 +302,11 @@ function MobileWallet() {
               </>
             )}
 
-            {/* VIEW: OUTPUT */}
             {viewMode === "output" && (
               <div className="space-y-6">
                 {Object.entries(groupedReports).map(([monthYear, reports]) => (
                   <div key={monthYear}>
-                    <h3 className="font-bold text-gray-400 text-xs uppercase tracking-wider pb-2 mb-2 border-b">
+                    <h3 className="font-bold text-gray-400 text-xs uppercase tracking-wider pb-2 mb-2 border-b dark:border-slate-800">
                       {monthYear}
                     </h3>
                     <div className="space-y-2">
@@ -304,76 +325,88 @@ function MobileWallet() {
             )}
           </div>
         </div>
-      </div>
+      </div >
+    );
+  };
 
-      {/* --- FIXED BOTTOM NAVIGATION --- */}
-      <div className="fixed bottom-0 w-full bg-white border-t border-gray-200 pb-safe pt-2 px-6 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20">
-        <div className="flex justify-between items-end pb-4">
-          <button
-            onClick={() => setActiveTab("home")}
-            className={`flex flex-col items-center gap-1 w-16 transition-colors ${activeTab === "home" ? "text-blue-600" : "text-gray-400"}`}
-          >
-            <Home size={24} strokeWidth={activeTab === "home" ? 3 : 2} />
-            <span className="text-[10px] font-bold">Home</span>
-          </button>
+  return (
+    <div className="min-h-screen bg-white">
 
-          <div className="relative -top-6">
-            <input
-              type="file"
-              capture="environment"
-              ref={fileInputRef}
-              className="hidden"
-              onChange={handleFile}
-            />
+      {/* FULL WIDTH CONTAINER */}
+      <div className="w-full min-h-screen bg-white relative flex flex-col overflow-hidden">
+
+        {/* The Dynamic Content */}
+        {renderContent()}
+
+        {/* Notification Dropdown - Rendered at root level for proper z-index */}
+        {showNotifications && <MobileNotificationDropdown onClose={() => setShowNotifications(false)} />}
+
+        {/* --- FIXED BOTTOM NAVIGATION --- */}
+        <div className="absolute bottom-0 w-full bg-white/90 backdrop-blur-lg border-t border-slate-200 pb-safe pt-2 px-6 shadow-[0_-10px_40px_rgba(0,0,0,0.08)] z-20">
+          <div className="flex justify-between items-end pb-4">
+            <button
+              onClick={() => setActiveTab("home")}
+              className={`flex flex-col items-center gap-1 w-16 transition-colors ${activeTab === "home" ? "text-blue-600" : "text-slate-400"}`}
+            >
+              <Home size={24} strokeWidth={activeTab === "home" ? 3 : 2} />
+              <span className="text-[10px] font-bold">Home</span>
+            </button>
+
+            <div className="relative -top-6">
+              <input
+                type="file"
+                capture="environment"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleFile}
+              />
+
+              <button
+                onClick={() => setIsPickerOpen(true)}
+                disabled={uploadMutation.isPending}
+                className="w-16 h-16 bg-blue-600 rounded-full shadow-xl shadow-blue-600/30 flex items-center justify-center text-white active:scale-95 transition-transform hover:scale-105"
+              >
+                <Plus size={32} strokeWidth={3} />
+              </button>
+            </div>
 
             <button
-              onClick={() => setIsPickerOpen(true)}
-              disabled={uploadMutation.isPending}
-              className="w-16 h-16 bg-blue-600 rounded-full shadow-xl shadow-blue-600/30 flex items-center justify-center text-white active:scale-95 transition-transform"
+              onClick={() => setActiveTab("settings")}
+              className={`flex flex-col items-center gap-1 w-16 transition-colors ${activeTab === "settings" ? "text-blue-600" : "text-slate-400"}`}
             >
-              <Plus size={32} strokeWidth={3} />
+              <Settings
+                size={24}
+                strokeWidth={activeTab === "settings" ? 3 : 2}
+              />
+              <span className="text-[10px] font-bold">Settings</span>
             </button>
           </div>
-
-          <button
-            onClick={() => setActiveTab("settings")}
-            className={`flex flex-col items-center gap-1 w-16 transition-colors ${activeTab === "settings" ? "text-blue-600" : "text-gray-400"}`}
-          >
-            <Settings
-              size={24}
-              strokeWidth={activeTab === "settings" ? 3 : 2}
-            />
-            <span className="text-[10px] font-bold">Settings</span>
-          </button>
         </div>
-      </div>
 
-      <CategoryPicker
-        isOpen={isPickerOpen}
-        onClose={() => setIsPickerOpen(false)}
-        onSelect={handleCategorySelect}
-      />
+        <CategoryPicker
+          isOpen={isPickerOpen}
+          onClose={() => setIsPickerOpen(false)}
+          onSelect={handleCategorySelect}
+        />
 
-      {uploadMutation.isPending && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center">
-          {/* Backdrop with Blur */}
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-
-          {/* Loading Card */}
-          <div className="relative bg-white p-6 rounded-2xl shadow-2xl w-64 text-center animate-in zoom-in-95 duration-200">
-            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Loader2 size={24} className="animate-spin" />
+        {uploadMutation.isPending && (
+          <div className="absolute inset-0 z-[60] flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+            <div className="relative bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-2xl w-64 text-center animate-in zoom-in-95 duration-200">
+              <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Loader2 size={24} className="animate-spin" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-1">
+                Analyzing...
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                Extracting data with AI &<br />
+                checking compliance.
+              </p>
             </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-1">
-              Analyzing...
-            </h3>
-            <p className="text-xs text-gray-500 leading-relaxed">
-              Extracting data with AI &<br />
-              checking compliance.
-            </p>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -381,7 +414,9 @@ function MobileWallet() {
 export default function Root() {
   return (
     <QueryClientProvider client={queryClient}>
-      <MobileWallet />
+      <ThemeProvider defaultTheme="light" storageKey="zoho-mobile-theme">
+        <MobileWallet />
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
