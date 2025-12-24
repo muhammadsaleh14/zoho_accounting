@@ -1,20 +1,15 @@
+// File: apps/web-plugin/src/components/Sidebar.tsx
 import {
   Bell,
-  Search,
-  HelpCircle,
-  Menu,
-  ShieldCheck,
-  Upload
-} from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
-import {
-  LayoutDashboard,
   Settings,
   LogOut,
   ChevronRight,
   Package,
-  X // Import X for close button
+  LayoutDashboard,
+  ShieldCheck,
+  X,
 } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -55,8 +50,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               <ShieldCheck size={20} className="text-white" />
             </div>
             <div>
-              <h1 className="text-base font-black leading-none tracking-tight">Zoho<span className="text-brand-400">Vault</span></h1>
-              <p className="text-[8px] text-slate-400 font-bold tracking-[0.1em] uppercase mt-0.5 opacity-80">Compliance Intelligence</p>
+              <h1 className="text-base font-black leading-none tracking-tight">
+                Zoho<span className="text-brand-400">Vault</span>
+              </h1>
+              <p className="text-[8px] text-slate-400 font-bold tracking-[0.1em] uppercase mt-0.5 opacity-80">
+                Compliance Intelligence
+              </p>
             </div>
           </div>
 
@@ -78,11 +77,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               <Link
                 key={item.label}
                 to={item.path}
-                onClick={() => onClose()} // Close on navigation (mobile)
-                className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 group ${isActive
-                  ? "bg-brand-50 text-brand-600 shadow-sm shadow-brand-100"
-                  : "text-black hover:bg-slate-50 hover:text-slate-900"
-                  }`}
+                onClick={onClose} // Close on navigation (mobile)
+                className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 group ${
+                  isActive
+                    ? "bg-brand-50 text-brand-600 shadow-sm shadow-brand-100"
+                    : "text-black hover:bg-slate-50 hover:text-slate-900"
+                }`}
               >
                 <div className="flex items-center gap-3">
                   <item.icon
@@ -91,7 +91,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   />
                   <span className="text-sm font-semibold">{item.label}</span>
                 </div>
-                {isActive && <ChevronRight size={14} className="text-brand-400" />}
+                {isActive && (
+                  <ChevronRight size={14} className="text-brand-400" />
+                )}
               </Link>
             );
           })}
@@ -104,8 +106,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               MS
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-slate-900 truncate">Muhammad Afaq </p>
-              <p className="text-[10px] text-slate-500 font-medium truncate italic">Premium Client</p>
+              <p className="text-sm font-bold text-slate-900 truncate">
+                Muhammad Afaq{" "}
+              </p>
+              <p className="text-[10px] text-slate-500 font-medium truncate italic">
+                Premium Client
+              </p>
             </div>
           </div>
 

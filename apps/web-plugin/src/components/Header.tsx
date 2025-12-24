@@ -1,14 +1,15 @@
+// File: apps/web-plugin/src/components/Header.tsx
 import {
   Bell,
   Search,
   HelpCircle,
   Menu,
   ShieldCheck,
-  Upload
-} from 'lucide-react';
-import { useState } from 'react';
-import { useSearch } from '../context/SearchContext';
-import { NotificationDropdown } from './NotificationDropdown';
+  Upload,
+} from "lucide-react";
+import { useState } from "react";
+import { useSearch } from "../context/SearchContext";
+import { NotificationDropdown } from "./NotificationDropdown";
 
 interface HeaderProps {
   onUploadClick: () => void;
@@ -21,7 +22,6 @@ export function Header({ onUploadClick, onMenuClick }: HeaderProps) {
 
   return (
     <header className="h-20 glass-panel bg-white/70 border-b border-slate-200/50 flex items-center justify-between px-4 lg:px-8 sticky top-0 z-40">
-
       {/* Left: Mobile Menu & Brand (Mobile Only) */}
       <div className="flex items-center gap-3 lg:hidden">
         <button
@@ -34,7 +34,9 @@ export function Header({ onUploadClick, onMenuClick }: HeaderProps) {
           <div className="bg-brand-500 p-1 rounded-md">
             <ShieldCheck size={14} className="text-white" />
           </div>
-          <span className="font-black text-slate-900 text-sm tracking-tight">Zoho<span className="text-brand-600">Vault</span></span>
+          <span className="font-black text-slate-900 text-sm tracking-tight">
+            Zoho<span className="text-brand-600">Vault</span>
+          </span>
         </div>
       </div>
 
@@ -43,12 +45,17 @@ export function Header({ onUploadClick, onMenuClick }: HeaderProps) {
         <div className="bg-brand-500 p-1 rounded-md">
           <ShieldCheck size={14} className="text-white" />
         </div>
-        <span className="font-black text-slate-900 text-sm tracking-tight">Zoho<span className="text-brand-600">Vault</span></span>
+        <span className="font-black text-slate-900 text-sm tracking-tight">
+          Zoho<span className="text-brand-600">Vault</span>
+        </span>
       </div>
 
       {/* Global Search - Hidden on Mobile for now, or simplified */}
       <div className="max-w-md w-full relative hidden md:block mx-4">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+        <Search
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+          size={18}
+        />
         <input
           type="text"
           placeholder="Search documents..."
@@ -69,7 +76,7 @@ export function Header({ onUploadClick, onMenuClick }: HeaderProps) {
         <div className="relative">
           <button
             onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-            className={`p-2.5 text-slate-500 hover:bg-brand-50 hover:text-brand-600 rounded-xl transition-all duration-300 relative hover:scale-110 hover:shadow-md hover:-translate-y-0.5 active:scale-95 active:translate-y-0 cursor-pointer ${isNotificationsOpen ? 'bg-brand-50 text-brand-600' : ''}`}
+            className={`p-2.5 text-slate-500 hover:bg-brand-50 hover:text-brand-600 rounded-xl transition-all duration-300 relative hover:scale-110 hover:shadow-md hover:-translate-y-0.5 active:scale-95 active:translate-y-0 cursor-pointer ${isNotificationsOpen ? "bg-brand-50 text-brand-600" : ""}`}
           >
             <Bell size={20} />
             <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
@@ -77,8 +84,13 @@ export function Header({ onUploadClick, onMenuClick }: HeaderProps) {
 
           {isNotificationsOpen && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setIsNotificationsOpen(false)}></div>
-              <NotificationDropdown onClose={() => setIsNotificationsOpen(false)} />
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIsNotificationsOpen(false)}
+              ></div>
+              <NotificationDropdown
+                onClose={() => setIsNotificationsOpen(false)}
+              />
             </>
           )}
         </div>
@@ -93,12 +105,14 @@ export function Header({ onUploadClick, onMenuClick }: HeaderProps) {
           onClick={onUploadClick}
           className="premium-button-glassy px-3 lg:px-4 py-3 rounded-2xl text-xs font-bold capitalize transition-all duration-300 border-2 flex items-center gap-2 group/btn"
         >
-          <Upload size={18} className="text-brand-600 group-hover/btn:scale-110 transition-transform" />
+          <Upload
+            size={18}
+            className="text-brand-600 group-hover/btn:scale-110 transition-transform"
+          />
           <span className="font-bold hidden sm:inline">Upload Document</span>
           <span className="font-bold sm:hidden">Upload</span>
         </button>
       </div>
-
     </header>
   );
 }
