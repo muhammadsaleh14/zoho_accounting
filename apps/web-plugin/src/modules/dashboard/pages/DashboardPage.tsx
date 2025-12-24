@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/shared/api/client";
+import { api } from "@receipt-app/shared/api/client";
 import { InboxTable } from "../components/InboxTable";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

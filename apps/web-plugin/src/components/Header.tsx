@@ -1,42 +1,57 @@
-import { Building2, Bell, UserCircle } from "lucide-react";
+import { Building2, UserCircle, RefreshCw, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { api } from "@receipt-app/shared/api/client";
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner"; // <--- Direct import
 
 export function Header() {
+  const syncMutation = useMutation({
+    mutationFn: api.triggerMasterSync,
+    onSuccess: () => {
+      // Sonner API: toast(title, { description: ... })
+      toast.success("Sync Started", {
+        description: "Updating Vendors and Accounts in the background...",
+      });
+    },
+    onError: () => {
+      toast.error("Sync Failed", {
+        description: "Could not connect to backend.",
+      });
+    },
+  });
+
   return (
     <header className="h-16 bg-slate-900 text-white flex items-center justify-between px-6 shadow-md z-30 flex-shrink-0">
-      {/* Brand / Logo */}
       <div className="flex items-center gap-3">
         <div className="bg-blue-600 p-2 rounded-lg">
           <Building2 className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="font-bold text-lg leading-tight tracking-tight">
-            <span className="text-blue-400">Finance</span>
-          </h1>
-          <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">
-            Client Portal Admin
-          </p>
+          <h1 className="font-bold text-lg leading-tight">Finance AI</h1>
         </div>
       </div>
 
-      {/* Right Side Tools */}
       <div className="flex items-center gap-4">
-        {/* Org Switcher (Visual Only) */}
-        <div className="hidden md:flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
-          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-          <span className="text-xs font-medium text-slate-300">
-            Sandbox Environment
-          </span>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => syncMutation.mutate()}
+          disabled={syncMutation.isPending}
+          className="bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-white"
+        >
+          {syncMutation.isPending ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4 mr-2" />
+          )}
+          Sync Master Data
+        </Button>
 
-        <button className="p-2 hover:bg-slate-800 rounded-full transition-colors relative">
-          <Bell className="w-5 h-5 text-slate-300" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-slate-900"></span>
-        </button>
+        <div className="h-6 w-px bg-slate-700 mx-2" />
 
-        <div className="flex items-center gap-2 pl-4 border-l border-slate-700">
+        <div className="flex items-center gap-2">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold text-slate-200">Accountant View</p>
-            <p className="text-xs text-slate-500">Admin Role</p>
+            <p className="text-sm font-bold text-slate-200">Admin</p>
           </div>
           <UserCircle className="w-9 h-9 text-slate-400" />
         </div>
