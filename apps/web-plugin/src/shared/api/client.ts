@@ -5,7 +5,6 @@ import type { Invoice } from "@receipt-app/shared";
 // const API_URL = "http://localhost:8000";
 const API_URL = "https://polemoniaceous-disclamatory-brett.ngrok-free.dev";
 
-
 // 2. TypeScript Definitions for Zoho SDK (UPDATED)
 
 // Helper to get params from the iframe URL

@@ -1,41 +1,14 @@
-from fastapi import FastAPI, Form, UploadFile, File
-from fastapi.exceptions import RequestValidationError
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from httpx import Request
-from pydantic import BaseModel
-from typing import List, Optional
-import time
-import shutil
 import os
-from dotenv import load_dotenv
-from services.gemini import analyze_receipt_with_gemini
-from services.zoho import create_bill_in_zoho, fetch_chart_of_accounts, fetch_customers # <--- Added
 
-load_dotenv()
-app = FastAPI()
+# Import the new router
+from app.api.v1 import accounting, documents, sync
 
+app = FastAPI(title="Zoho Accounting AI")
 
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    # Get the raw body to see what the frontend actually sent
-    body = await request.body()
-    print(f"\n❌ 422 VALIDATION ERROR:")
-    print(f"URL: {request.url}")
-    print(f"Body Received: {body.decode('utf-8')}")
-    print(f"Missing/Wrong Fields: {exc.errors()}\n")
-    
-    return JSONResponse(
-        status_code=422,
-        content={"detail": exc.errors(), "body": body.decode('utf-8')},
-    )
-
-# --- CONFIGURATION ---
-# UPDATE THIS WITH YOUR CURRENT NGROK URL
-# BASE_URL = "http://localhost:8000"  # e.g., "https://abcd1234.ngrok.io"
-BASE_URL = "https://polemoniaceous-disclamatory-brett.ngrok-free.dev"
-# --- 1. CORS ---
+# CORS (Allow Frontend)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -44,264 +17,16 @@ app.add_middleware(
     allow_headers=["*"], 
 )
 
-# --- 2. STATIC FILES ---
+# Static Files (For viewing images)
 os.makedirs("uploads", exist_ok=True)
 app.mount("/images", StaticFiles(directory="uploads"), name="images")
 
-# --- 3. DATA MODELS (Updated for Checklist) ---
-class ComplianceChecklist(BaseModel):
-    taxInvoiceLabel: bool
-    supplierName: bool
-    supplierAddress: bool
-    supplierTRN: bool
-    customerName: bool
-    customerAddress: bool
-    customerTRN: bool
-    invoiceDate: bool
-    invoiceNumber: bool
-    lineItemsDetailed: bool
-    subtotalExclVAT: bool
-    vatRateShown: bool
-    vatAmountShown: bool
-    totalAmountMatch: bool
 
-class ComplianceResult(BaseModel):
-    isCompliant: bool
-    missingFields: List[str]
-    confidenceScore: float
-    checklist: ComplianceChecklist # <--- Added this
-
-
-class BankTransaction(BaseModel):
-    date: str
-    description: str
-    amount: float
-
-
-class BankStatementData(BaseModel):
-    openingBalance: float
-    closingBalance: float
-    transactions: List[BankTransaction]
-    
-class Invoice(BaseModel):
-    id: str
-    vendor: str
-    date: str = "Unknown Date"
-    amount: float
-    currency: str
-    invoiceNumber: Optional[str] = None
-    status: str
-    imageUrl: str
-
-    category: str
-
-    # 🔥 THIS IS WHAT WAS DROPPING YOUR DATA
-    bankStatementData: Optional[BankStatementData] = None
-
-    compliance: ComplianceResult
-
-    
-# --- NEW DATA MODELS ---
-class LineItem(BaseModel):
-    description: str
-    accountId: str
-    quantity: float
-    rate: float
-    # Optional because user might select "None"
-    customerId: Optional[str] = "" 
-
-class ApproveRequest(BaseModel):
-    id: str
-    vendor: str
-    
-    # MAPPING FIX: React sends 'billNumber', previous model expected 'invoiceNumber'
-    billNumber: str 
-    
-    # MAPPING FIX: React sends 'billDate', previous model expected 'date'
-    billDate: str   
-    
-    dueDate: str
-    orderNumber: Optional[str] = ""
-    subject: Optional[str] = ""
-    
-    # React sends adjustment as string or number depending on input, force float
-    adjustment: float 
-    
-    amount: float
-    lineItems: List[LineItem]
-
-
-    
-# --- 4. IN-MEMORY DB ---
-invoices_db = [] 
-
-# --- 5. ENDPOINTS ---
+# Register Routers
+app.include_router(documents.router, prefix="/api/v1/documents", tags=["Documents"])
+app.include_router(sync.router, prefix="/api/v1/sync", tags=["Sync"]) # <--- Register it
+app.include_router(accounting.router, prefix="/api/v1/accounting", tags=["Accounting"]) # <--- Register
 
 @app.get("/")
 def read_root():
-    return {"status": "Backend is running"}
-
-@app.get("/customers")
-async def get_customers():
-    return await fetch_customers()
-
-@app.get("/invoices", response_model=List[Invoice])
-def get_invoices():
-    return list(reversed(invoices_db))
-
-@app.post("/upload")
-async def upload_invoice(
-    file: UploadFile = File(...), 
-    category: str = Form("bill") # <--- NEW: Accept category as Form Data, default to 'bill'
-):
-     # --- BANK STATEMENT DEMO LOGIC ---
-    if category == "bank_statement":
-        print("--- Bank Statement Received: Returning Mock Data ---")
-        time.sleep(1) # Simulate processing
-        
-        mock_statement_data = {
-            "openingBalance": 1000.00,
-            "closingBalance": 2550.50,
-            "transactions": [
-                {"date": "2025-12-01", "description": "ACH Deposit - Client A", "amount": 2000.00},
-                {"date": "2025-12-05", "description": "Withdrawal - ATM", "amount": -100.00},
-                {"date": "2025-12-10", "description": "Stripe Payout", "amount": 750.50},
-            ]
-        }
-        
-        # We must return an object that matches the 'Invoice' model.
-        bank_statement_invoice = {
-            "id": str(int(time.time())),
-            "vendor": "Emirates NBD - Bank Statement",
-            "date": "2025-12-31",
-            "amount": mock_statement_data["closingBalance"],
-            "currency": "AED",
-            "invoiceNumber": None,
-            "status": "review",
-            "imageUrl": f"{BASE_URL}/images/report.pdf",
-            
-            # --- THE FIXES ---
-            "category": "bank_statement", # <-- MUST ADD THIS
-            "bankStatementData": mock_statement_data, # <-- MUST ADD THIS
-            
-            "compliance": {
-                "isCompliant": True, "missingFields": [], "confidenceScore": 1.0,
-                # Create a default "passing" checklist
-                "checklist": { "taxInvoiceLabel": True, "supplierName": True, "supplierAddress": True, "supplierTRN": True, "customerName": True, "customerAddress": True, "customerTRN": True, "invoiceDate": True, "invoiceNumber": True, "lineItemsDetailed": True, "subtotalExclVAT": True, "vatRateShown": True, "vatAmountShown": True, "totalAmountMatch": True }
-            }
-        }
-        print("Returning Mock Bank Statement Invoice:", bank_statement_invoice)
-        invoices_db.append(bank_statement_invoice)
-        return bank_statement_invoice
-    
-    # 1. Save File (Existing logic)
-    filename = f"{int(time.time())}_{file.filename}"
-    file_location = f"uploads/{filename}"
-    
-    with open(file_location, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-        
-    # 2. Read for AI (Existing logic)
-    with open(file_location, "rb") as f:
-        file_bytes = f.read()
-    
-    file_type = file.content_type or "image/jpeg"
-    
-    # 3. Analyze (Existing logic)
-    print(f"--- Processing {category.upper()} : {filename} ---")
-    ai_result = analyze_receipt_with_gemini(file_bytes, file_type)
-    
-# --- ADD THIS BLOCK ---
-    checklist_data = ai_result.get("compliance_checklist", {})
-    
-    checklist_obj = {
-        "taxInvoiceLabel": checklist_data.get("taxInvoiceLabel", False),
-        "supplierName": checklist_data.get("supplierName", False),
-        "supplierAddress": checklist_data.get("supplierAddress", False),
-        "supplierTRN": checklist_data.get("supplierTRN", False),
-        "customerName": checklist_data.get("customerName", False),
-        "customerAddress": checklist_data.get("customerAddress", False),
-        "customerTRN": checklist_data.get("customerTRN", False),
-        "invoiceDate": checklist_data.get("invoiceDate", False),
-        "invoiceNumber": checklist_data.get("invoiceNumber", False),
-        "lineItemsDetailed": checklist_data.get("lineItemsDetailed", False),
-        "subtotalExclVAT": checklist_data.get("subtotalExclVAT", False),
-        "vatRateShown": checklist_data.get("vatRateShown", False),
-        "vatAmountShown": checklist_data.get("vatAmountShown", False),
-        "totalAmountMatch": checklist_data.get("totalAmountMatch", False),
-    }
-    # ----------------------
-    # 4. Create Invoice Object
-    # 4. Create Invoice Object
-    new_invoice = {
-        "id": str(int(time.time())),
-        # Use 'or' to catch None/null values from the AI
-        "vendor": ai_result.get("vendor") or "Unknown Vendor",
-        "date": ai_result.get("date") or "2025-01-01",
-        "amount": ai_result.get("amount") or 0.0,
-        "currency": ai_result.get("currency") or "AED",
-        
-        "invoiceNumber": ai_result.get("invoice_number"),
-        "status": "review" if not ai_result.get("isCompliant") else "queue",
-        "imageUrl": f"{BASE_URL}/images/{filename}",
-        
-        "category": category, 
-        
-        "compliance": {
-            "isCompliant": ai_result.get("isCompliant", False),
-            "missingFields": ai_result.get("missingFields", []),
-            "confidenceScore": ai_result.get("confidenceScore", 0.0),
-            "checklist": checklist_obj
-        }
-    }
-    
-    invoices_db.append(new_invoice)
-    return new_invoice
-
-
-@app.post("/approve")
-async def approve_invoice_endpoint(data: ApproveRequest):
-    # 1. Find the local file path from our database
-    local_path = None
-    for inv in invoices_db:
-        if inv["id"] == data.id:
-            filename = inv["imageUrl"].split("/images/")[-1]
-            local_path = f"uploads/{filename}"
-            break
-            
-    zoho_response = await create_bill_in_zoho(data.dict(), local_image_path=local_path)
-    
-    print("Zoho Response:", zoho_response)
-    
-    if zoho_response.get("code") == 0:
-        # 2. SUCCESS: Update the Local Database with the EDITED values
-        for inv in invoices_db:
-            if inv["id"] == data.id:
-                # Update Status
-                inv["status"] = "approved"
-                
-                # --- NEW: SAVE USER EDITS ---
-                # This ensures the History tab shows what the user actually typed,
-                # not what the AI originally guessed.
-                inv["vendor"] = data.vendor
-                inv["amount"] = data.amount
-                inv["date"] = data.billDate      # Map 'billDate' to 'date'
-                inv["invoiceNumber"] = data.billNumber # Map 'billNumber' to 'invoiceNumber'
-                
-                # We can also store the Zoho Bill ID if we want to link to it later
-                inv["zohoBillId"] = zoho_response["bill"]["bill_id"]
-                break
-        
-        return {"status": "success", "message": "Bill Created", "details": zoho_response}
-    else:
-        return {"status": "error", "message": zoho_response.get("message")}
-    
-@app.get("/accounts")
-async def get_accounts():
-    accounts = await fetch_chart_of_accounts()
-    # Fallback if Zoho connection fails (so Demo doesn't break)
-    if not accounts:
-        return [
-            {"account_id": "999", "account_name": "Uncategorized Expense (Offline Mode)"}
-        ]
-    return accounts
+    return {"status": "Backend V2 is running", "db": "PostgreSQL Connected"}

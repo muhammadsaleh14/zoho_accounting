@@ -1,5 +1,5 @@
 {
-  "name": "@receipt-app/shared",
+"name": "@receipt-app/shared",
   "version": "1.0.0",
   "main": "index.ts",
   "license": "MIT"
