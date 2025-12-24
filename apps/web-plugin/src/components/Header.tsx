@@ -6,7 +6,9 @@ import {
   ShieldCheck,
   Upload
 } from 'lucide-react';
+import { useState } from 'react';
 import { useSearch } from '../context/SearchContext';
+import { NotificationDropdown } from './NotificationDropdown';
 
 interface HeaderProps {
   onUploadClick: () => void;
@@ -15,6 +17,7 @@ interface HeaderProps {
 
 export function Header({ onUploadClick, onMenuClick }: HeaderProps) {
   const { searchQuery, setSearchQuery } = useSearch();
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   return (
     <header className="h-20 glass-panel bg-white/70 border-b border-slate-200/50 flex items-center justify-between px-4 lg:px-8 sticky top-0 z-40">
@@ -63,10 +66,22 @@ export function Header({ onUploadClick, onMenuClick }: HeaderProps) {
           <Search size={20} />
         </button>
 
-        <button className="p-2.5 text-slate-500 hover:bg-brand-50 hover:text-brand-600 rounded-xl transition-all relative">
-          <Bell size={20} />
-          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+            className={`p-2.5 text-slate-500 hover:bg-brand-50 hover:text-brand-600 rounded-xl transition-all duration-300 relative hover:scale-110 hover:shadow-md hover:-translate-y-0.5 active:scale-95 active:translate-y-0 cursor-pointer ${isNotificationsOpen ? 'bg-brand-50 text-brand-600' : ''}`}
+          >
+            <Bell size={20} />
+            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
+          </button>
+
+          {isNotificationsOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setIsNotificationsOpen(false)}></div>
+              <NotificationDropdown onClose={() => setIsNotificationsOpen(false)} />
+            </>
+          )}
+        </div>
 
         <button className="p-2.5 text-slate-500 hover:bg-slate-100 rounded-xl transition-all hidden sm:block">
           <HelpCircle size={20} />
