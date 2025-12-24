@@ -8,7 +8,25 @@ from app.api.v1 import accounting, documents, sync
 
 app = FastAPI(title="Zoho Accounting AI")
 
-# CORS (Allow Frontend)
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # Get the raw body to see what the frontend actually sent
+    body = await request.body()
+    print(f"\n❌ 422 VALIDATION ERROR:")
+    print(f"URL: {request.url}")
+    print(f"Body Received: {body.decode('utf-8')}")
+    print(f"Missing/Wrong Fields: {exc.errors()}\n")
+    
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": body.decode('utf-8')},
+    )
+
+# --- CONFIGURATION ---
+# UPDATE THIS WITH YOUR CURRENT NGROK URL
+BASE_URL = "http://localhost:8000"  # e.g., "https://abcd1234.ngrok.io"
+# BASE_URL = "https://polemoniaceous-disclamatory-brett.ngrok-free.dev"
+# --- 1. CORS ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
