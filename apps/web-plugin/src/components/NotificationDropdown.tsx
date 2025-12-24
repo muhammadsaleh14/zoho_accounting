@@ -9,6 +9,8 @@ import {
     Check
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useEffect, useState } from 'react';
+import { api } from '../services/api';
 
 interface NotificationDropdownProps {
     onClose: () => void;
@@ -23,59 +25,26 @@ interface Notification {
     read: boolean;
 }
 
-const notifications: Notification[] = [
-    {
-        id: '1',
-        title: 'Monthly Financial Report Generated',
-        description: 'Your Profit & Loss statement for Dec 2025 is ready.',
-        time: '12 mins ago',
-        type: 'success',
-        read: false
-    },
-    {
-        id: '2',
-        title: 'Compliance Verification Failed',
-        description: 'Document "Invoice_INV-2025-001" failed automatic VAT verification.',
-        time: '1 hour ago',
-        type: 'alert',
-        read: false
-    },
-    {
-        id: '3',
-        title: 'Subscription Renewed',
-        description: 'Your "Premium Business" plan has been successfully renewed.',
-        time: '3 hours ago',
-        type: 'info',
-        read: true
-    },
-    {
-        id: '4',
-        title: 'System Update',
-        description: 'Updated tax engine for 2026 amendments.',
-        time: '5 hours ago',
-        type: 'info',
-        read: true
-    },
-    {
-        id: '5',
-        title: 'Bulk Upload Complete',
-        description: '14 documents verified, 1 requires review.',
-        time: 'Yesterday',
-        type: 'document',
-        read: true
-    }
-];
-
-const getTypeStyles = (type: string) => {
-    switch (type) {
-        case 'success': return { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' };
-        case 'alert': return { icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50' };
-        case 'document': return { icon: FileText, color: 'text-brand-600', bg: 'bg-brand-50' };
-        default: return { icon: Info, color: 'text-slate-600', bg: 'bg-slate-100' };
-    }
-};
-
 export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+
+    useEffect(() => {
+        const fetchNotifs = async () => {
+            const data = await api.getNotifications();
+            setNotifications(data);
+        };
+        fetchNotifs();
+    }, []);
+
+    const getTypeStyles = (type: string) => {
+        switch (type) {
+            case 'success': return { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' };
+            case 'alert': return { icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50' };
+            case 'document': return { icon: FileText, color: 'text-brand-600', bg: 'bg-brand-50' };
+            default: return { icon: Info, color: 'text-slate-600', bg: 'bg-slate-100' };
+        }
+    };
+
     return (
         <div className="absolute top-16 right-4 sm:right-20 w-80 sm:w-96 bg-white/90 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-xl z-50 animate-fade-in overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white/50">

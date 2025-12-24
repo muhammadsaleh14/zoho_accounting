@@ -29,6 +29,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { icon: Package, label: "Document Vault", path: "/vault" },
     { icon: Bell, label: "Notifications", path: "/notifications" },
     { icon: Settings, label: "Settings", path: "/settings" },
+    { icon: ShieldCheck, label: "Compliance Check", path: "/compliance" },
   ];
 
   return (

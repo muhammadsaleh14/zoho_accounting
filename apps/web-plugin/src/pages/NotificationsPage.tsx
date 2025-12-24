@@ -9,6 +9,8 @@ import {
     MoreVertical,
     FileCheck
 } from "lucide-react";
+import { useEffect, useState } from 'react';
+import { api } from '../services/api';
 
 interface Notification {
     id: string;
@@ -20,64 +22,20 @@ interface Notification {
 }
 
 export function NotificationsPage() {
-    const notifications: Notification[] = [
-        {
-            id: '1',
-            title: 'Monthly Financial Report Generated',
-            description: 'Your Profit & Loss statement for Dec 2025 is ready. Net profit margin is up by 12% compared to last month.',
-            time: '12 mins ago',
-            type: 'success',
-            read: false
-        },
-        {
-            id: '2',
-            title: 'Compliance Verification Failed',
-            description: 'Document "Invoice_INV-2025-001" failed automatic VAT verification. The Tax Registration Number (TRN) appears to be invalid.',
-            time: '1 hour ago',
-            type: 'alert',
-            read: false
-        },
-        {
-            id: '3',
-            title: 'Subscription Renewed',
-            description: 'Your "Premium Business" plan has been successfully renewed. Next billing date: Jan 24, 2026.',
-            time: '3 hours ago',
-            type: 'info',
-            read: true
-        },
-        {
-            id: '4',
-            title: 'System Update: Tax Regulation Changes',
-            description: 'We have updated our tax engine to reflect the new 2026 UAE Corporate Tax amendments. No action required.',
-            time: '5 hours ago',
-            type: 'info',
-            read: true
-        },
-        {
-            id: '5',
-            title: 'Bulk Upload Processing Complete',
-            description: 'A batch of 15 receipts was successfully processed. 14 documents were verified, 1 requires manual review.',
-            time: 'Yesterday',
-            type: 'document',
-            read: true
-        },
-        {
-            id: '6',
-            title: 'Auditor Access Requested',
-            description: 'External auditor "KPMG UAE" has requested read-only access to your FY2025 records.',
-            time: 'Yesterday',
-            type: 'alert',
-            read: true
-        },
-        {
-            id: '7',
-            title: 'New Feature: AI Expense Forecasting',
-            description: 'Check out the new Forecasting tab in your dashboard to see AI-driven cash flow predictions.',
-            time: '2 days ago',
-            type: 'success',
-            read: true
-        }
-    ];
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchNotifs = async () => {
+            const data = await api.getNotifications();
+            setNotifications(data);
+            setLoading(false);
+        };
+        fetchNotifs();
+        // Poll every 10 seconds for demo
+        const interval = setInterval(fetchNotifs, 10000);
+        return () => clearInterval(interval);
+    }, []);
 
     const getTypeStyles = (type: string) => {
         switch (type) {

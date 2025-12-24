@@ -7,6 +7,7 @@ import { ReviewPage } from './pages/ReviewPage';
 import { VaultPage } from './pages/VaultPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { CompliancePage } from './pages/CompliancePage';
 import { DocumentUpload } from './components/DocumentUpload';
 import { SearchProvider } from './context/SearchContext';
 
@@ -35,6 +36,7 @@ function App() {
                 <Route path="/vault" element={<VaultPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/compliance" element={<CompliancePage />} />
 
                 {/* Fallback Route */}
                 <Route path="*" element={<Navigate to="/" replace />} />

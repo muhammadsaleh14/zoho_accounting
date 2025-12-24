@@ -1,0 +1,90 @@
+{
+  "invoices": [
+    {
+      "id": "1766606661",
+      "vendor": "Unknown Vendor",
+      "date": "2025-01-01",
+      "amount": 0.0,
+      "currency": "AED",
+      "invoiceNumber": null,
+      "status": "review",
+      "imageUrl": "http://localhost:8000/images/1766606661_invoice_success.pdf",
+      "category": "bill",
+      "compliance": {
+        "isCompliant": false,
+        "missingFields": [
+          "Server Error: AI Key Missing"
+        ],
+        "confidenceScore": 0.0,
+        "checklist": {
+          "taxInvoiceLabel": false,
+          "supplierName": false,
+          "supplierAddress": false,
+          "supplierTRN": false,
+          "customerName": false,
+          "customerAddress": false,
+          "customerTRN": false,
+          "invoiceDate": false,
+          "invoiceNumber": false,
+          "lineItemsDetailed": false,
+          "subtotalExclVAT": false,
+          "vatRateShown": false,
+          "vatAmountShown": false,
+          "totalAmountMatch": false
+        }
+      }
+    },
+    {
+      "id": "1766614284",
+      "vendor": "Unknown Vendor",
+      "date": "2025-01-01",
+      "amount": 0.0,
+      "currency": "AED",
+      "invoiceNumber": null,
+      "status": "review",
+      "imageUrl": "http://localhost:8000/images/1766614284_Requirement Engineering Exam.pdf",
+      "category": "bill",
+      "compliance": {
+        "isCompliant": false,
+        "missingFields": [
+          "Server Error: AI Key Missing"
+        ],
+        "confidenceScore": 0.0,
+        "checklist": {
+          "taxInvoiceLabel": false,
+          "supplierName": false,
+          "supplierAddress": false,
+          "supplierTRN": false,
+          "customerName": false,
+          "customerAddress": false,
+          "customerTRN": false,
+          "invoiceDate": false,
+          "invoiceNumber": false,
+          "lineItemsDetailed": false,
+          "subtotalExclVAT": false,
+          "vatRateShown": false,
+          "vatAmountShown": false,
+          "totalAmountMatch": false
+        }
+      }
+    }
+  ],
+  "notifications": [
+    {
+      "id": "1766606661_n",
+      "title": "Compliance Issue Detected",
+      "description": "Invoice from Unknown Vendor is missing mandatory fields.",
+      "time": "Just now",
+      "type": "alert",
+      "read": false
+    },
+    {
+      "id": "1766614284_n",
+      "title": "Compliance Issue Detected",
+      "description": "Invoice from Unknown Vendor is missing mandatory fields.",
+      "time": "Just now",
+      "type": "alert",
+      "read": false
+    }
+  ]
+}

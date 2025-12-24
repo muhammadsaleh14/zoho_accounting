@@ -66,6 +66,18 @@ export const api = {
     }
   },
 
+  getNotifications: async (): Promise<any[]> => {
+    try {
+      const response = await axios.get(`${API_URL}/notifications`, {
+        headers: { "ngrok-skip-browser-warning": "true" },
+      });
+      return response.data;
+    } catch (err) {
+      console.error("Failed to fetch notifications");
+      return [];
+    }
+  },
+
   approveInvoice: async (data: any) => {
     // Allow 'any' or define complex type
     const response = await axios.post(`${API_URL}/approve`, data, {

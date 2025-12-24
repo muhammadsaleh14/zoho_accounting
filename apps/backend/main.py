@@ -132,8 +132,29 @@ class ApproveRequest(BaseModel):
 
 
     
-# --- 4. IN-MEMORY DB ---
-invoices_db = [] 
+import json
+
+# --- 4. PERSISTENCE SETUP ---
+DB_FILE = "data/db.json"
+os.makedirs("data", exist_ok=True)
+
+def load_db():
+    if not os.path.exists(DB_FILE):
+        return {"invoices": [], "notifications": []}
+    try:
+        with open(DB_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {"invoices": [], "notifications": []}
+
+def save_db(data):
+    with open(DB_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+# Initialize State
+db_state = load_db()
+invoices_db = db_state["invoices"]
+notifications_db = db_state.get("notifications", []) # Backwards compatibility
 
 # --- 5. ENDPOINTS ---
 
@@ -145,6 +166,12 @@ def read_root():
 async def get_customers():
     return await fetch_customers()
 
+@app.get("/notifications")
+def get_notifications():
+    response = list(reversed(notifications_db))
+    # Filter out any that might be malformed
+    return [n for n in response if isinstance(n, dict) and "id" in n]
+
 @app.get("/invoices", response_model=List[Invoice])
 def get_invoices():
     return list(reversed(invoices_db))
@@ -152,12 +179,19 @@ def get_invoices():
 @app.post("/upload")
 async def upload_invoice(
     file: UploadFile = File(...), 
-    category: str = Form("bill") # <--- NEW: Accept category as Form Data, default to 'bill'
+    category: str = Form("bill") 
 ):
-     # --- BANK STATEMENT DEMO LOGIC ---
+    # 1. Save File (Existing logic)
+    filename = f"{int(time.time())}_{file.filename}"
+    file_location = f"uploads/{filename}"
+    
+    with open(file_location, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    # --- BANK STATEMENT DEMO LOGIC ---
     if category == "bank_statement":
         print("--- Bank Statement Received: Returning Mock Data ---")
-        time.sleep(1) # Simulate processing
+        time.sleep(1) 
         
         mock_statement_data = {
             "openingBalance": 1000.00,
@@ -169,7 +203,6 @@ async def upload_invoice(
             ]
         }
         
-        # We must return an object that matches the 'Invoice' model.
         bank_statement_invoice = {
             "id": str(int(time.time())),
             "vendor": "Emirates NBD - Bank Statement",
@@ -179,41 +212,43 @@ async def upload_invoice(
             "invoiceNumber": None,
             "status": "review",
             "imageUrl": f"{BASE_URL}/images/report.pdf",
-            
-            # --- THE FIXES ---
-            "category": "bank_statement", # <-- MUST ADD THIS
-            "bankStatementData": mock_statement_data, # <-- MUST ADD THIS
-            
+            "category": "bank_statement",
+            "bankStatementData": mock_statement_data,
             "compliance": {
                 "isCompliant": True, "missingFields": [], "confidenceScore": 1.0,
-                # Create a default "passing" checklist
                 "checklist": { "taxInvoiceLabel": True, "supplierName": True, "supplierAddress": True, "supplierTRN": True, "customerName": True, "customerAddress": True, "customerTRN": True, "invoiceDate": True, "invoiceNumber": True, "lineItemsDetailed": True, "subtotalExclVAT": True, "vatRateShown": True, "vatAmountShown": True, "totalAmountMatch": True }
             }
         }
-        print("Returning Mock Bank Statement Invoice:", bank_statement_invoice)
-        invoices_db.append(bank_statement_invoice)
-        return bank_statement_invoice
-    
-    # 1. Save File (Existing logic)
-    filename = f"{int(time.time())}_{file.filename}"
-    file_location = f"uploads/{filename}"
-    
-    with open(file_location, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
         
-    # 2. Read for AI (Existing logic)
+        # SAVE TO DB
+        invoices_db.append(bank_statement_invoice)
+        
+        # CREATE NOTIFICATION
+        new_notification = {
+            "id": str(int(time.time())),
+            "title": "New Bank Statement Uploaded",
+            "description": "Emirates NBD Statement ready for reconciliation.",
+            "time": "Just now",
+            "type": "info",
+            "read": False
+        }
+        notifications_db.append(new_notification)
+        
+        save_db({"invoices": invoices_db, "notifications": notifications_db})
+        
+        return bank_statement_invoice
+
+    # 2. Read for AI 
     with open(file_location, "rb") as f:
         file_bytes = f.read()
     
     file_type = file.content_type or "image/jpeg"
     
-    # 3. Analyze (Existing logic)
+    # 3. Analyze 
     print(f"--- Processing {category.upper()} : {filename} ---")
     ai_result = analyze_receipt_with_gemini(file_bytes, file_type)
     
-# --- ADD THIS BLOCK ---
     checklist_data = ai_result.get("compliance_checklist", {})
-    
     checklist_obj = {
         "taxInvoiceLabel": checklist_data.get("taxInvoiceLabel", False),
         "supplierName": checklist_data.get("supplierName", False),
@@ -230,32 +265,48 @@ async def upload_invoice(
         "vatAmountShown": checklist_data.get("vatAmountShown", False),
         "totalAmountMatch": checklist_data.get("totalAmountMatch", False),
     }
-    # ----------------------
+
     # 4. Create Invoice Object
-    # 4. Create Invoice Object
+    is_compliant = ai_result.get("isCompliant", False)
     new_invoice = {
         "id": str(int(time.time())),
-        # Use 'or' to catch None/null values from the AI
         "vendor": ai_result.get("vendor") or "Unknown Vendor",
         "date": ai_result.get("date") or "2025-01-01",
         "amount": ai_result.get("amount") or 0.0,
         "currency": ai_result.get("currency") or "AED",
-        
         "invoiceNumber": ai_result.get("invoice_number"),
-        "status": "review" if not ai_result.get("isCompliant") else "queue",
+        "status": "review" if not is_compliant else "queue",
         "imageUrl": f"{BASE_URL}/images/{filename}",
-        
         "category": category, 
-        
         "compliance": {
-            "isCompliant": ai_result.get("isCompliant", False),
+            "isCompliant": is_compliant,
             "missingFields": ai_result.get("missingFields", []),
             "confidenceScore": ai_result.get("confidenceScore", 0.0),
             "checklist": checklist_obj
         }
     }
     
+    # SAVE TO DB
     invoices_db.append(new_invoice)
+    
+    # CREATE NOTIFICATION
+    vendor_name = new_invoice["vendor"]
+    notif_type = 'alert' if not is_compliant else 'success'
+    notif_title = "Compliance Issue Detected" if not is_compliant else "New Invoice Uploaded"
+    notif_desc = f"Invoice from {vendor_name} is missing mandatory fields." if not is_compliant else f"Invoice from {vendor_name} verified successfully."
+    
+    new_notification = {
+        "id": str(int(time.time())) + "_n",
+        "title": notif_title,
+        "description": notif_desc,
+        "time": "Just now",
+        "type": notif_type,
+        "read": False
+    }
+    notifications_db.append(new_notification)
+    
+    save_db({"invoices": invoices_db, "notifications": notifications_db})
+
     return new_invoice
 
 
@@ -291,6 +342,8 @@ async def approve_invoice_endpoint(data: ApproveRequest):
                 # We can also store the Zoho Bill ID if we want to link to it later
                 inv["zohoBillId"] = zoho_response["bill"]["bill_id"]
                 break
+        
+        save_db({"invoices": invoices_db, "notifications": notifications_db})
         
         return {"status": "success", "message": "Bill Created", "details": zoho_response}
     else:
