@@ -1,0 +1,114 @@
+body {
+    font-family: sans-serif;
+    background-color: #f4f5f7;
+    color: #172b4d;
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 20px;
+    border-radius: 5px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.uploader {
+    text-align: center;
+    padding: 40px;
+    border: 2px dashed #dfe1e6;
+    border-radius: 5px;
+}
+
+.bill-form fieldset {
+    border: 1px solid #dfe1e6;
+    border-radius: 3px;
+    margin-bottom: 20px;
+    padding: 15px;
+}
+
+.bill-form legend {
+    font-weight: bold;
+    color: #5e6c84;
+    padding: 0 5px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 10px;
+    align-items: center;
+}
+
+input, select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    box-sizing: border-box;
+}
+
+input:read-only {
+    background-color: #f4f5f7;
+    cursor: not-allowed;
+}
+
+.line-items-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.line-items-table th, .line-items-table td {
+    text-align: left;
+    padding: 8px;
+    border-bottom: 1px solid #dfe1e6;
+}
+
+.line-items-table th {
+    background-color: #f4f5f7;
+}
+
+.actions {
+    text-align: right;
+    margin-top: 20px;
+}
+
+button {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-left: 10px;
+}
+
+.approve-btn {
+    background-color: #0052cc;
+    color: white;
+}
+
+.cancel-btn {
+    background-color: #dfe1e6;
+}
+
+.warning {
+    background-color: #fffae6;
+    color: #974f0c;
+    border: 1px solid #ffc400;
+    padding: 10px;
+    border-radius: 3px;
+    margin-bottom: 20px;
+}
+
+.spinner {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0,0,0,0.7);
+    color: white;
+    padding: 20px;
+    border-radius: 5px;
+}
