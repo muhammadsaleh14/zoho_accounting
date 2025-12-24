@@ -2,8 +2,8 @@ import axios from "axios";
 import type { Invoice } from "@receipt-app/shared";
 
 // 1. Configuration: Localhost Backend
-// const API_URL = "http://localhost:8000";
-const API_URL = "https://polemoniaceous-disclamatory-brett.ngrok-free.dev";
+const API_URL = "http://localhost:8000";
+// const API_URL = "https://polemoniaceous-disclamatory-brett.ngrok-free.dev";
 
 
 // 2. TypeScript Definitions for Zoho SDK (UPDATED)
@@ -33,9 +33,10 @@ export const api = {
   },
 
   // Upload a file (POST /upload)
-  uploadReceipt: async (file: File): Promise<Invoice> => {
+  uploadReceipt: async (file: File, category: string = "invoice"): Promise<Invoice> => {
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("category", category);
 
     const response = await axios.post(`${API_URL}/upload`, formData, {
       headers: {

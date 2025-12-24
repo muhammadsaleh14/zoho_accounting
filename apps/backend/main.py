@@ -33,8 +33,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 # --- CONFIGURATION ---
 # UPDATE THIS WITH YOUR CURRENT NGROK URL
-# BASE_URL = "http://localhost:8000"  # e.g., "https://abcd1234.ngrok.io"
-BASE_URL = "https://polemoniaceous-disclamatory-brett.ngrok-free.dev"
+BASE_URL = "http://localhost:8000"  # e.g., "https://abcd1234.ngrok.io"
+# BASE_URL = "https://polemoniaceous-disclamatory-brett.ngrok-free.dev"
 # --- 1. CORS ---
 app.add_middleware(
     CORSMiddleware,

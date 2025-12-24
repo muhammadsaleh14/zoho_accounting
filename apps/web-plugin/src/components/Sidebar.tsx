@@ -1,142 +1,120 @@
-import { useState } from "react";
-import type { Invoice } from "@receipt-app/shared";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../services/api";
-import { useRef } from "react";
 import {
-  LayoutList,
-  History,
-  UploadCloud,
-  AlertCircle,
-  CheckCircle2,
+  Bell,
+  Search,
+  HelpCircle,
+  Menu,
+  ShieldCheck,
+  Upload
+} from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import {
+  LayoutDashboard,
+  Settings,
+  LogOut,
+  ChevronRight,
+  Package,
+  X // Import X for close button
 } from "lucide-react";
 
-interface Props {
-  selectedId: string | null;
-  onSelect: (invoice: Invoice) => void;
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-export function Sidebar({ selectedId, onSelect }: Props) {
-  const [activeTab, setActiveTab] = useState<"queue" | "history">("queue");
-  const queryClient = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+export function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const location = useLocation();
 
-  const { data: invoices } = useQuery({
-    queryKey: ["invoices"],
-    queryFn: api.getInvoices,
-  });
-
-  const uploadMutation = useMutation({
-    mutationFn: api.uploadReceipt,
-    onSuccess: (newInvoice) => {
-      queryClient.invalidateQueries({ queryKey: ["invoices"] });
-      setActiveTab("queue"); // Switch to queue to see new item
-      onSelect(newInvoice);
-    },
-  });
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) uploadMutation.mutate(file);
-  };
-
-  const filteredInvoices = invoices?.filter((inv) => {
-    if (activeTab === "queue")
-      return inv.status === "queue" || inv.status === "review";
-    if (activeTab === "history")
-      return inv.status === "approved" || inv.status === "rejected";
-    return false;
-  });
+  const navItems = [
+    { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+    { icon: Package, label: "Document Vault", path: "/vault" },
+    { icon: Bell, label: "Notifications", path: "/notifications" },
+    { icon: Settings, label: "Settings", path: "/settings" },
+  ];
 
   return (
-    <aside className="w-80 bg-white border-r border-slate-200 flex flex-col h-full flex-shrink-0">
-      {/* Upload Header */}
-      <div className="p-4 border-b border-slate-100 bg-slate-50 space-y-3">
-        <input
-          type="file"
-          ref={fileInputRef}
-          className="hidden"
-          accept="image/*,.pdf"
-          onChange={handleFileChange}
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 lg:hidden animate-fade-in"
+          onClick={onClose}
         />
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploadMutation.isPending}
-          className="w-full py-2.5 px-3 bg-slate-900 text-white rounded-md text-sm font-semibold hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-sm"
-        >
-          <UploadCloud size={16} />
-          {uploadMutation.isPending ? "Scanning..." : "Upload Receipt"}
-        </button>
-      </div>
+      )}
 
-      {/* Tabs */}
-      <div className="flex border-b border-slate-200">
-        <button
-          onClick={() => setActiveTab("queue")}
-          className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 border-b-2 transition-colors ${
-            activeTab === "queue"
-              ? "border-blue-500 text-blue-600 bg-blue-50/50"
-              : "border-transparent text-slate-500 hover:bg-slate-50"
-          }`}
-        >
-          <LayoutList size={14} /> Queue
-        </button>
-        <button
-          onClick={() => setActiveTab("history")}
-          className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 border-b-2 transition-colors ${
-            activeTab === "history"
-              ? "border-blue-500 text-blue-600 bg-blue-50/50"
-              : "border-transparent text-slate-500 hover:bg-slate-50"
-          }`}
-        >
-          <History size={14} /> History
-        </button>
-      </div>
-
-      {/* List */}
-      <div className="flex-1 overflow-y-auto bg-white">
-        {/* Empty State */}
-        {filteredInvoices?.length === 0 && (
-          <div className="p-8 text-center text-slate-400">
-            <p className="text-sm">No receipts in {activeTab}</p>
+      {/* Sidebar Container */}
+      <aside
+        className={`
+          fixed lg:sticky top-0 h-screen w-72 glass-panel flex flex-col z-50 transition-transform duration-300 ease-in-out
+          ${isOpen ? "translate-x-0 " : "-translate-x-full lg:translate-x-0"}
+        `}
+      >
+        {/* Brand Section */}
+        <div className="p-6 pb-2 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 px-3 py-3 rounded-2xl bg-slate-900 shadow-xl shadow-slate-900/10 text-white transition-all hover:scale-[1.02] border border-white/10 w-full lg:w-auto">
+            <div className="bg-brand-500 p-2 rounded-xl">
+              <ShieldCheck size={20} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-base font-black leading-none tracking-tight">Zoho<span className="text-brand-400">Vault</span></h1>
+              <p className="text-[8px] text-slate-400 font-bold tracking-[0.1em] uppercase mt-0.5 opacity-80">Compliance Intelligence</p>
+            </div>
           </div>
-        )}
 
-        {filteredInvoices?.map((invoice) => (
-          <div
-            key={invoice.id}
-            onClick={() => onSelect(invoice)}
-            className={`
-              p-4 border-b border-slate-50 cursor-pointer transition-all duration-150 group
-              ${selectedId === invoice.id ? "bg-blue-50 border-l-4 border-l-blue-500" : "hover:bg-slate-50 border-l-4 border-l-transparent"}
-            `}
+          {/* Mobile Close Button */}
+          <button
+            onClick={onClose}
+            className="lg:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-xl"
           >
-            <div className="flex justify-between items-start mb-1">
-              <span
-                className={`font-semibold text-sm truncate pr-2 ${selectedId === invoice.id ? "text-blue-900" : "text-slate-700"}`}
-              >
-                {invoice.vendor}
-              </span>
-              {/* Status Icon */}
-              {invoice.status === "review" && (
-                <AlertCircle size={14} className="text-red-500" />
-              )}
-              {invoice.status === "approved" && (
-                <CheckCircle2 size={14} className="text-green-500" />
-              )}
-            </div>
+            <X size={20} />
+          </button>
+        </div>
 
-            <div className="flex justify-between text-xs text-slate-500 mt-1.5">
-              <span>{invoice.date}</span>
-              <span
-                className={`font-mono font-medium ${selectedId === invoice.id ? "text-blue-700" : "text-slate-600"}`}
+        {/* Navigation */}
+        <nav className="flex-1 px-6 py-8 space-y-2 overflow-y-auto">
+          <p className="zoho-label px-4 text-black mb-4">Main Menu</p>
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <Link
+                key={item.label}
+                to={item.path}
+                onClick={() => onClose()} // Close on navigation (mobile)
+                className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 group ${isActive
+                  ? "bg-brand-50 text-brand-600 shadow-sm shadow-brand-100"
+                  : "text-black hover:bg-slate-50 hover:text-slate-900"
+                  }`}
               >
-                {invoice.currency} {invoice.amount.toFixed(2)}
-              </span>
+                <div className="flex items-center gap-3">
+                  <item.icon
+                    size={20}
+                    className={`transition-colors ${isActive ? "text-brand-600" : "text-slate-400 group-hover:text-slate-900"}`}
+                  />
+                  <span className="text-sm font-semibold">{item.label}</span>
+                </div>
+                {isActive && <ChevronRight size={14} className="text-brand-400" />}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Account Info */}
+        <div className="p-6 mt-auto">
+          <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100 mb-4 items-center flex gap-3">
+            <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center text-slate-500 font-bold">
+              MS
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-slate-900 truncate">Muhammad Afaq </p>
+              <p className="text-[10px] text-slate-500 font-medium truncate italic">Premium Client</p>
             </div>
           </div>
-        ))}
-      </div>
-    </aside>
+
+          <button className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-all font-semibold text-sm">
+            <LogOut size={18} />
+            Sign Out
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }
