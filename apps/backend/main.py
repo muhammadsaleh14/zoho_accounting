@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request  # <-- Add Request here
+from fastapi.exceptions import RequestValidationError  # <-- Add this entire line
+from fastapi.responses import JSONResponse  # <-- Add this entire line
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
