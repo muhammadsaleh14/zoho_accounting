@@ -17,6 +17,11 @@ export const api = {
         return response.data;
     },
 
+    getInvoiceById: async (id: string): Promise<Invoice> => {
+        const response = await axios.get(`${API_BASE_URL}/documents/invoices/${id}`, axiosConfig);
+        return response.data;
+    },
+
     uploadReceipt: async (file: File, category: string = "bill"): Promise<Invoice> => {
         const formData = new FormData();
         formData.append("file", file);

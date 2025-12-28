@@ -31,7 +31,7 @@ export function BillReviewPage() {
           <ArrowLeft className="w-4 h-4 mr-2" /> Back
         </Button>
         <NgrokImage
-          src={invoice.imageUrl}
+          src={invoice.image_url}
           className="max-h-full max-w-full object-contain"
         />
       </div>

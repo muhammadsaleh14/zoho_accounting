@@ -14,6 +14,7 @@ from app.services.ai_extractor import analyze_document
 from app.crud import crud_vendor
 from app.schemas.unified import ExtractedData
 from app.schemas.unified import ExtractedData, InvoiceResponse 
+from pdf2image import convert_from_path
 
 router = APIRouter()
 
@@ -22,20 +23,13 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.get("/invoices", response_model=List[InvoiceResponse])
 def get_all_invoices(db: Session = Depends(get_db)):
-    """
-    Fetches all processed documents and manually prepares them for the response
-    to ensure correct date formatting.
-    """
     db_invoices = crud_invoice.get_invoices(db)
-    
-    # Explicitly construct the response data to avoid serialization errors
     response_data = []
     for inv in db_invoices:
         inv_dict = {
             "id": inv.id,
             "vendor_id": inv.vendor_id,
             "vendor_name_raw": inv.vendor_name_raw,
-            # This is the key fix: convert date objects to strings
             "date": inv.date.isoformat() if inv.date else None,
             "due_date": inv.due_date.isoformat() if inv.due_date else None,
             "amount": inv.amount,
@@ -48,12 +42,41 @@ def get_all_invoices(db: Session = Depends(get_db)):
             "compliance_data": inv.compliance_data,
             "zoho_bill_id": inv.zoho_bill_id,
             "created_at": inv.created_at,
-            "line_items": inv.line_items # Nested relationships will serialize correctly from here
+            "line_items": inv.line_items
         }
         response_data.append(inv_dict)
-        
     return response_data
 
+
+@router.get("/invoices/{invoice_id}", response_model=InvoiceResponse)
+def get_invoice_by_id(invoice_id: int, db: Session = Depends(get_db)):
+    """
+    Fetches a single invoice by its database ID.
+    """
+    db_invoice = crud_invoice.get_invoice(db, invoice_id=invoice_id)
+    if db_invoice is None:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    # Manually prepare response to handle date serialization
+    response_data = {
+        "id": db_invoice.id,
+        "vendor_id": db_invoice.vendor_id,
+        "vendor_name_raw": db_invoice.vendor_name_raw,
+        "date": db_invoice.date.isoformat() if db_invoice.date else None,
+        "due_date": db_invoice.due_date.isoformat() if db_invoice.due_date else None,
+        "amount": db_invoice.amount,
+        "currency": db_invoice.currency,
+        "tax_amount": db_invoice.tax_amount,
+        "invoice_number": db_invoice.invoice_number,
+        "status": db_invoice.status,
+        "category": db_invoice.category,
+        "image_url": db_invoice.image_url,
+        "compliance_data": db_invoice.compliance_data,
+        "zoho_bill_id": db_invoice.zoho_bill_id,
+        "created_at": db_invoice.created_at,
+        "line_items": db_invoice.line_items
+    }
+    return response_data
 
 @router.get("/notifications")
 def get_notifications():
@@ -82,20 +105,46 @@ async def upload_document(
     5. Returns the newly created database record.
     """
     
-    filename = f"{int(time.time())}_{file.filename}"
-    file_path = os.path.join(UPLOAD_DIR, filename)
-    image_url_for_db = f"/images/{filename}" # Use the relative path for the DB
-
-    with open(file_path, "wb") as buffer:
+    original_filename = f"{int(time.time())}_{file.filename}"
+    original_filepath = os.path.join(UPLOAD_DIR, original_filename)
+    
+    # Save the original file first
+    with open(original_filepath, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
+
+    # --- MODIFIED: PDF to Image Conversion Logic ---
+    preview_image_filename = original_filename
+    
+    if file.content_type == "application/pdf":
+        print("🖼️  PDF detected. Converting first page to JPEG for preview...")
+        try:
+            # Generate a new filename for the JPEG preview
+            jpeg_filename = os.path.splitext(original_filename)[0] + "_preview.jpeg"
+            jpeg_filepath = os.path.join(UPLOAD_DIR, jpeg_filename)
+            
+            # Convert the first page of the PDF to a JPEG image
+            images = convert_from_path(original_filepath, first_page=1, last_page=1, fmt='jpeg')
+            if images:
+                images[0].save(jpeg_filepath, 'JPEG')
+                preview_image_filename = jpeg_filename # Use the new JPEG as the preview
+                print(f"✅  Conversion successful. Preview saved to {jpeg_filename}")
+        except Exception as e:
+            print(f"⚠️ PDF conversion failed: {e}. Using original file path.")
+            # If conversion fails, we'll fall back, but the image will likely be broken
+            # In a production app, you might replace it with a generic PDF icon URL
+    
+    # The URL for the database and frontend will always point to an image now
+    image_url_for_db = f"/images/{preview_image_filename}"
+    # --- END OF MODIFICATION ---
         
-    with open(file_path, "rb") as f:
+    with open(original_filepath, "rb") as f:
         file_bytes = f.read()
     
-    mime_type = file.content_type or "image/jpeg"
+    mime_type = file.content_type or "application/pdf"
 
-    print(f"--- Analyzing {filename} with Gemini ---")
+    print(f"--- Analyzing {original_filename} with Gemini ---")
     extracted_data = await analyze_document(file_bytes, db, mime_type)
+
     
     # ... (Category Validation and Vendor Enrichment logic remains the same) ...
     if extracted_data.vendor and extracted_data.vendor.name:
@@ -129,7 +178,26 @@ async def upload_document(
             line_items_data=line_items_for_db
         )
         print(f"✅ Saved new invoice to DB with ID: {db_invoice.id}")
-        return db_invoice # Return the saved object
+
+        response_data = {
+            "id": db_invoice.id,
+            "vendor_id": db_invoice.vendor_id,
+            "vendor_name_raw": db_invoice.vendor_name_raw,
+            "date": db_invoice.date.isoformat() if db_invoice.date else None,
+            "due_date": db_invoice.due_date.isoformat() if db_invoice.due_date else None,
+            "amount": db_invoice.amount,
+            "currency": db_invoice.currency,
+            "tax_amount": db_invoice.tax_amount,
+            "invoice_number": db_invoice.invoice_number,
+            "status": db_invoice.status,
+            "category": db_invoice.category,
+            "image_url": db_invoice.image_url,
+            "compliance_data": db_invoice.compliance_data,
+            "zoho_bill_id": db_invoice.zoho_bill_id,
+            "created_at": db_invoice.created_at,
+            "line_items": db_invoice.line_items
+        }
+        return response_data
 
     except Exception as e:
         print(f"❌ DATABASE ERROR during upload: {e}")

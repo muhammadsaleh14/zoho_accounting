@@ -27,7 +27,7 @@ export const api = {
       ...response.data,
       id: `temp_${Date.now()}`,
       status: "review",
-      imageUrl: URL.createObjectURL(file), // Display local blob immediately
+      image_url: URL.createObjectURL(file), // Display local blob immediately
     };
   },
 

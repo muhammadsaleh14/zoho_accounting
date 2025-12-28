@@ -27,35 +27,37 @@ export interface ComplianceChecklist {
 
 // 3. The Main Data Object (Matches Pydantic 'ExtractedData')
 export interface Invoice {
-  // We map 'id' in frontend to a temp ID or use invoice_number if available
-  // But for the raw response, we follow the backend structure
+  id?: string; // Keep this optional for local state
   category: DocumentCategory;
-  confidence_score: number;
-  warning_message?: string | null;
+  confidenceScore: number;
+  warningMessage?: string | null;
 
   vendor?: VendorDraft;
 
-  date?: string; // YYYY-MM-DD
-  invoice_number?: string;
-  reference_number?: string; // PO Number
-
-  currency: string;
-  total_amount: number;
-  tax_amount: number;
+  // --- MODIFIED: Ensure all keys are camelCase ---
+  vendorId?: number | null;
+  vendorNameRaw?: string;
+  date?: string;
+  dueDate?: string;
+  invoiceNumber?: string;
+  referenceNumber?: string;
+  taxAmount: number;
+  totalAmount: number; // Use totalAmount to match AI extractor
   discount: number;
-  adjustment?: number; // Added for frontend state, even if AI doesn't return it yet
-
-  line_items: LineItem[];
-
-  opening_balance?: number;
-  closing_balance?: number;
-
-  compliance?: ComplianceChecklist;
-
-  // Frontend specific (for displaying images)
-  imageUrl?: string;
-  id?: string; // We usually generate a temp ID for React keys
+  adjustment?: number;
+  currency: string;
   status?: ReceiptStatus;
+  image_url?: string; // This is the critical change
+  complianceData?: ComplianceChecklist;
+  zohoBillId?: string | null;
+  createdAt?: string; // Date strings from JSON
+  // --- END OF MODIFICATION ---
+  
+  lineItems: LineItem[];
+
+  // Deprecated fields from old structure, can be removed if not used
+  amount?: number; 
+  
 }
 
 // 4. Account (For Dropdowns)

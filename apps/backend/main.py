@@ -3,6 +3,7 @@ from fastapi.exceptions import RequestValidationError  # <-- Add this entire lin
 from fastapi.responses import JSONResponse  # <-- Add this entire line
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 import os
 
 # Import the new router
@@ -37,7 +38,6 @@ app.add_middleware(
     allow_headers=["*"], 
 )
 
-# Static Files (For viewing images)
 os.makedirs("uploads", exist_ok=True)
 app.mount("/images", StaticFiles(directory="uploads"), name="images")
 

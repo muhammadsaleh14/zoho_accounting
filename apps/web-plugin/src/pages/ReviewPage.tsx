@@ -4,18 +4,27 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../services/api";
 import { ComplianceWorkspace } from "../components/ComplianceWorkspace";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import type { Invoice } from "@/services/api";
+import type { Invoice } from "@receipt-app/shared";
 
 export function ReviewPage() {
   const { invoiceId } = useParams();
   const navigate = useNavigate();
 
-  const { data: invoices, isLoading } = useQuery<Invoice[]>({
-    queryKey: ["invoices"],
-    queryFn: api.getInvoices,
+  const { data: invoice, isLoading } = useQuery<Invoice>({
+    // The query key is now unique to this specific invoice
+    queryKey: ["invoice", invoiceId],
+    // The query function calls our new API method
+    queryFn: () => api.getInvoiceById(invoiceId!),
+    // This ensures the query only runs if invoiceId is a valid string
+    enabled: !!invoiceId,
   });
 
-  const selectedInvoice = invoices?.find((inv) => inv.id === invoiceId);
+  // const { data: invoices, isLoading } = useQuery<Invoice[]>({
+  //   queryKey: ["invoices"],
+  //   queryFn: api.getInvoices,
+  // });
+
+  // const selectedInvoice = invoices?.find((inv) => inv.id === Number(invoiceId));
 
   if (isLoading) {
     return (
@@ -25,7 +34,7 @@ export function ReviewPage() {
     );
   }
 
-  if (!selectedInvoice) {
+  if (!invoice) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center">
         <h2 className="text-lg font-bold text-slate-700">Document Not Found</h2>
@@ -44,14 +53,14 @@ export function ReviewPage() {
 
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* Custom Header for this page is inside the workspace */}
       <div className="flex-1 overflow-hidden">
         <ComplianceWorkspace
-          key={selectedInvoice.id}
-          invoice={selectedInvoice}
-          onSuccess={() => navigate("/")} // Go back to dashboard on success
+          key={invoice.id}
+          invoice={invoice}
+          onSuccess={() => navigate("/")}
         />
       </div>
     </div>
   );
+  
 }

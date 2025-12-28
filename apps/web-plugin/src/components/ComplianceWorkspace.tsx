@@ -117,7 +117,7 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
       subject: header.subject,
       adjustment: adjustmentVal,
       line_items: lines.map((l) => ({ ...l, account_id: l.accountId })), // map accountId to account_id
-      temp_file_path: invoice.imageUrl,
+      temp_file_path: invoice.image_url,
     });
   };
 
@@ -140,9 +140,9 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
             <PinOff size={16} />
           </button>
         </div>
-        <div className="flex-1 p-4 flex items-center justify-center">
+        <div className="flex-1 p-4 flex justify-center overflow-y-auto"> 
           <NgrokImage
-            src={invoice.imageUrl}
+            src={invoice.image_url}
             className="max-w-full max-h-full object-contain shadow-2xl"
           />
         </div>

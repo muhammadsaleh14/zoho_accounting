@@ -10,7 +10,7 @@ import type { ImgHTMLAttributes } from 'react';
 export function NgrokImage(props: ImgHTMLAttributes<HTMLImageElement>) {
   // Your backend should serve images from a static directory.
   // E.g., FastAPI's StaticFiles mount.
-  // The `imageUrl` from the backend should be a relative path like `/images/filename.jpg`
+  // The `image_url` from the backend should be a relative path like `/images/filename.jpg`
   const fullSrc = `http://localhost:8000${props.src}`;
   return <img {...props} src={fullSrc} alt={props.alt || "Document Image"} />;
 }
