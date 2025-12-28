@@ -55,7 +55,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./apps/web-plugin/dist
-          destination_dir: ./zoho_accounting # Matches the 'base' in its vite.config.ts
+          destination_dir: ./ # Matches the 'base' in its vite.config.ts
           keep_files: true # This is critical for monorepos
 
       # --- Build and Deploy Client Mobile ---
@@ -71,5 +71,5 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./apps/client-mobile/dist
-          destination_dir: ./zoho_accounting/mobile # Matches the 'base' in its vite.config.ts
+          destination_dir: ./mobile # Matches the 'base' in its vite.config.ts
           keep_files: true
