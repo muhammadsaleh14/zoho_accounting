@@ -1,48 +1,40 @@
 import axios from "axios";
 import type { DocumentCategory, Invoice } from "@receipt-app/shared";
 
-// REPLACE THIS WITH YOUR PC'S LOCAL IP (e.g., 192.168.1.5)
-// Do NOT use localhost (your phone won't see it)
-export const API_BASE = "http://localhost:8000";
-// export const API_BASE = "https://polemoniaceous-disclamatory-brett.ngrok-free.dev";
+export const API_BASE = "http://localhost:8000/api/v1";
 
+// --- ADDED: Common headers for all requests ---
+const axiosConfig = {
+  headers: {
+    "ngrok-skip-browser-warning": "true",
+  },
+};
 
 export const api = {
   getInvoices: async (): Promise<Invoice[]> => {
-    const response = await axios.get(`${API_BASE}/invoices`, {
-      headers: {
-        // Option 1: ngrok skip browser warning header
-        "ngrok-skip-browser-warning": "true",
-
-        // Option 2 (optional): custom User-Agent (if you want to use this)
-        // 'User-Agent': 'MyCustomAgent/1.0',
-      },
-    });
+    const response = await axios.get(`${API_BASE}/documents/invoices`, axiosConfig); // <- MODIFIED
     return response.data;
   },
 
-  uploadReceipt: async (
-    file: File,
-    category: DocumentCategory
-  ): Promise<Invoice> => {
+  uploadReceipt: async (file: File, category: DocumentCategory): Promise<Invoice> => {
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("category", category); // <--- Send it
+    formData.append("category", category);
 
-    const response = await axios.post(`${API_BASE}/upload`, formData, {
+    const uploadConfig = {
       headers: {
+        ...axiosConfig.headers,
         "Content-Type": "multipart/form-data",
-        "ngrok-skip-browser-warning": "true",
       },
-    });
+    };
+
+    const response = await axios.post(`${API_BASE}/documents/upload`, formData, uploadConfig); // <- MODIFIED
     return response.data;
   },
 
   getNotifications: async (): Promise<any[]> => {
     try {
-      const response = await axios.get(`${API_BASE}/notifications`, {
-        headers: { "ngrok-skip-browser-warning": "true" },
-      });
+      const response = await axios.get(`${API_BASE}/documents/notifications`, axiosConfig); // <- MODIFIED
       return response.data;
     } catch (error) {
       console.warn("Failed to fetch notifications, returning dummy data.");

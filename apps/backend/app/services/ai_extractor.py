@@ -1,11 +1,11 @@
 import json
-from sqlalchemy.orm import Session # <--- Import Session
+from sqlalchemy.orm import Session
 from google import genai
 from google.genai import types
 
 from app.core.config import settings
 from app.schemas.unified import ExtractedData, VendorDraft, LineItemBase, ComplianceChecklist
-from app.crud import crud_account # <--- Import CRUD
+from app.crud import crud_account
 
 # Initialize Client
 try:
@@ -14,11 +14,11 @@ except Exception as e:
     print(f"Warning: Gemini Client failed to initialize. Error: {e}")
     client = None
 
-# UPDATED PROMPT: We now ask for 'expense_category'
+# --- MODIFIED: Enhanced System Prompt for Compliance Details ---
 SYSTEM_PROMPT = """
-You are an expert AI Accountant. Analyze this document.
+You are an expert AI Accountant specializing in UAE VAT compliance. Analyze this document meticulously.
 
-STEP 1: CLASSIFY (bill, invoice, bank_statement).
+STEP 1: CLASSIFY the document into one of these categories: "bill", "invoice", "bank_statement".
 
 STEP 2: EXTRACT standard fields:
 - vendor_name, vendor_trn, vendor_address
@@ -30,7 +30,16 @@ For each line item, extract:
 - description, quantity, rate
 - expense_category: Predict the accounting category (e.g. "Meals and Entertainment", "Travel Expense", "Office Supplies", "IT Equipment", "Cost of Goods Sold").
 
-RETURN JSON ONLY. Structure:
+STEP 4: COMPLIANCE AUDIT: Perform a detailed check for mandatory fields on a tax invoice. Return a boolean for each. The fields are:
+- taxInvoiceLabel: Is the document clearly marked "Tax Invoice"?
+- supplierName: Is the supplier's name present?
+- supplierTRN: Is a 15-digit Tax Registration Number (TRN) present?
+- invoiceDate: Is the date of issue present?
+- lineItemsDetailed: Are there item descriptions, quantities, and prices?
+- vatAmountShown: Is the total VAT amount explicitly shown?
+- totalAmountMatch: Does the math (subtotal + tax) add up to the total?
+
+RETURN JSON ONLY. The structure MUST be:
 {
   "category": "string",
   "confidence_score": float,
@@ -66,14 +75,13 @@ def normalize_float(val):
     except:
         return 0.0
 
-# UPDATED SIGNATURE: Added db: Session
 async def analyze_document(file_bytes: bytes, db: Session, mime_type: str = "image/jpeg") -> ExtractedData:
     if not client:
         return ExtractedData(category="error", warning_message="AI Server Disconnected")
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-pro",
             contents=[
                 types.Content(
                     role="user",
@@ -88,51 +96,41 @@ async def analyze_document(file_bytes: bytes, db: Session, mime_type: str = "ima
 
         raw_text = response.text.replace("```json", "").replace("```", "").strip()
         raw_data = json.loads(raw_text)
-        
-        # ... (Vendor & Header mapping remains the same as before) ...
+
         raw_vendor = raw_data.get("vendor_data", {})
         vendor_obj = VendorDraft(
             name=raw_vendor.get("name") or "Unknown Vendor",
             trn=raw_vendor.get("trn"),
             address=raw_vendor.get("address"),
-            is_new=True 
+            is_new=True
         )
         raw_header = raw_data.get("header", {})
 
-        # --- SMART ACCOUNT MATCHING ---
         raw_lines = raw_data.get("lines", [])
         clean_lines = []
-        
         for item in raw_lines:
             qty = normalize_float(item.get("quantity", 1))
             rate = normalize_float(item.get("rate", 0))
             if qty == 0: qty = 1.0
-            
             ai_category_guess = item.get("expense_category")
             matched_account_id = None
-            
-            # If AI gave a guess, look it up in Postgres
             if ai_category_guess:
-                # We search our local DB for an account matching the AI's string
-                # e.g. AI says "Meals", DB finds "Meals and Entertainment" -> Returns ID 45000...001
                 account = crud_account.get_account_by_name_match(db, ai_category_guess)
                 if account:
                     matched_account_id = account.zoho_id
-
             clean_lines.append(LineItemBase(
                 description=item.get("description") or "Item",
                 quantity=qty,
                 rate=rate,
-                accountId=matched_account_id # <--- The Real Zoho ID from DB
+                accountId=matched_account_id
             ))
-        # ------------------------------
 
-        # ... (Compliance mapping remains same) ...
+        # --- MODIFIED: Map the detailed compliance object ---
         raw_comp = raw_data.get("compliance", {})
         comp_obj = ComplianceChecklist(
-            isCompliant=len(raw_comp.get("missing_fields", [])) == 0,
-            missingFields=raw_comp.get("missing_fields", []),
-            details=raw_comp.get("details", {})
+            isCompliant=raw_comp.get("isCompliant", False),
+            missingFields=raw_comp.get("missingFields", []),
+            details=raw_comp.get("details", {}) # Pass the whole details object
         )
 
         result = ExtractedData(
@@ -147,11 +145,8 @@ async def analyze_document(file_bytes: bytes, db: Session, mime_type: str = "ima
             total_amount=normalize_float(raw_header.get("total")),
             tax_amount=normalize_float(raw_header.get("tax")),
             line_items=clean_lines,
-            opening_balance=normalize_float(raw_header.get("opening_balance")),
-            closing_balance=normalize_float(raw_header.get("closing_balance")),
             compliance=comp_obj
         )
-        
         return result
 
     except Exception as e:

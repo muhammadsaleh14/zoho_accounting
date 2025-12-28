@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
+from datetime import date, datetime
 
 # 1. SHARED COMPONENTS
 class ComplianceChecklist(BaseModel):
@@ -59,3 +60,35 @@ class ExtractedData(BaseModel):
     closing_balance: Optional[float] = None
     
     compliance: Optional[ComplianceChecklist] = None
+
+class LineItemResponse(BaseModel):
+    id: int
+    description: str
+    quantity: float
+    rate: float
+    zoho_account_id: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class InvoiceResponse(BaseModel):
+    id: int
+    vendor_id: Optional[int] = None
+    vendor_name_raw: Optional[str] = None
+    # --- MODIFIED: Revert date fields to simple strings ---
+    date: Optional[str] = None
+    due_date: Optional[str] = None
+    # ---
+    amount: float
+    currency: str
+    tax_amount: float
+    invoice_number: Optional[str] = None
+    status: str
+    category: str
+    image_url: str
+    compliance_data: Optional[Dict[str, Any]] = None
+    zoho_bill_id: Optional[str] = None
+    created_at: datetime
+    
+    line_items: List[LineItemResponse] = []
+
+    # --- MODIFIED: Remove the json_encoders config ---
+    model_config = ConfigDict(from_attributes=True)

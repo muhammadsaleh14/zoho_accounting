@@ -3,10 +3,21 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.payables import BillApproveRequest
-from app.services.zoho import create_zoho_contact, create_zoho_bill, upload_attachment_to_bill
+from app.services.zoho import create_zoho_contact, create_zoho_bill, upload_attachment_to_bill, fetch_all_contacts
 from app.crud import crud_account, crud_vendor, crud_invoice
 
 router = APIRouter()
+
+@router.get("/customers")
+async def get_customers_from_zoho():
+    """
+    Fetches all 'customer' type contacts from Zoho for billable expense dropdown.
+    """
+    try:
+        customers = await fetch_all_contacts(contact_type="customer")
+        return customers
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/accounts")
 def get_accounts(db: Session = Depends(get_db)):

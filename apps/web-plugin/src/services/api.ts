@@ -1,148 +1,61 @@
 import axios from "axios";
-import type { Invoice } from "@receipt-app/shared";
+import type { Invoice, LedgerAccount } from "@receipt-app/shared";
 
-// 1. Configuration: Localhost Backend
-const API_URL = "http://localhost:8000";
-// const API_URL = "https://polemoniaceous-disclamatory-brett.ngrok-free.dev";
+// This remains unchanged
+export const API_BASE_URL = "http://localhost:8000/api/v1";
 
-
-// 2. TypeScript Definitions for Zoho SDK (UPDATED)
-
-// Helper to get params from the iframe URL
-// const getQueryParam = (param: string) => {
-//   const urlParams = new URLSearchParams(window.location.search);
-//   return urlParams.get(param);
-// };
+// --- ADDED: Common headers for all requests ---
+const axiosConfig = {
+    headers: {
+        "ngrok-skip-browser-warning": "true",
+    },
+};
 
 export const api = {
-  // Fetch the list (GET /invoices)
-  getInvoices: async (): Promise<Invoice[]> => {
-    // Note: We use direct Axios for invoices because your backend is Localhost
-    // and we enabled CORS in FastAPI.
-    const response = await axios.get(`${API_URL}/invoices`, {
-      headers: {
-        // Option 1: ngrok skip browser warning header
-        "ngrok-skip-browser-warning": "true",
+    getInvoices: async (): Promise<Invoice[]> => {
+        const response = await axios.get(`${API_BASE_URL}/documents/invoices`, axiosConfig); // <- MODIFIED
+        return response.data;
+    },
 
-        // Option 2 (optional): custom User-Agent (if you want to use this)
-        // 'User-Agent': 'MyCustomAgent/1.0',
-      },
-    });
-    console.log("Fetched invoices:", response.data);
-    return response.data;
-  },
+    uploadReceipt: async (file: File, category: string = "bill"): Promise<Invoice> => {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("category", category);
 
-  // Upload a file (POST /upload)
-  uploadReceipt: async (file: File, category: string = "invoice"): Promise<Invoice> => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("category", category);
+        // Combine headers for multipart form data
+        const uploadConfig = {
+            headers: {
+                ...axiosConfig.headers,
+                "Content-Type": "multipart/form-data",
+            },
+        };
 
-    const response = await axios.post(`${API_URL}/upload`, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-        "ngrok-skip-browser-warning": "true",
-      },
-    });
+        const response = await axios.post(`${API_BASE_URL}/documents/upload`, formData, uploadConfig); // <- MODIFIED
+        return response.data;
+    },
 
-    console.log("Upload response:", response.data);
-    return response.data;
-  },
+    getCustomers: async (): Promise<any[]> => {
+        try {
+            const response = await axios.get(`${API_BASE_URL}/accounting/customers`, axiosConfig); // <- MODIFIED
+            return response.data;
+        } catch (err) {
+            console.error("Failed to fetch customers", err);
+            return [];
+        }
+    },
 
-  getCustomers: async () => {
-    try {
-      const response = await axios.get(`${API_URL}/customers`, {
-        headers: {
-          // Option 1: ngrok skip browser warning header
-          "ngrok-skip-browser-warning": "true",
+    getNotifications: async (): Promise<any[]> => {
+        const response = await axios.get(`${API_BASE_URL}/documents/notifications`, axiosConfig); // <- MODIFIED
+        return response.data;
+    },
 
-          // Option 2 (optional): custom User-Agent (if you want to use this)
-          // 'User-Agent': 'MyCustomAgent/1.0',
-        },
-      });
-      return response.data;
-    } catch (err) {
-      return []; // Fallback
-    }
-  },
+    getChartOfAccounts: async (): Promise<LedgerAccount[]> => {
+        const response = await axios.get(`${API_BASE_URL}/accounting/accounts`, axiosConfig); // <- MODIFIED
+        return response.data;
+    },
 
-  getNotifications: async (): Promise<any[]> => {
-    try {
-      const response = await axios.get(`${API_URL}/notifications`, {
-        headers: { "ngrok-skip-browser-warning": "true" },
-      });
-      return response.data;
-    } catch (err) {
-      console.error("Failed to fetch notifications");
-      return [];
-    }
-  },
-
-  approveInvoice: async (data: any) => {
-    // Allow 'any' or define complex type
-    const response = await axios.post(`${API_URL}/approve`, data, {
-      headers: {
-        // Option 1: ngrok skip browser warning header
-        "ngrok-skip-browser-warning": "true",
-
-        // Option 2 (optional): custom User-Agent (if you want to use this)
-        // 'User-Agent': 'MyCustomAgent/1.0',
-      },
-    });
-    return response.data;
-  },
-
-  getChartOfAccounts: async (): Promise<
-    { account_id: string; account_name: string }[]
-  > => {
-    try {
-      // Calls your FastAPI backend, which handles the Zoho Auth
-      const response = await axios.get(`${API_URL}/accounts`, {
-        headers: {
-          // Option 1: ngrok skip browser warning header
-          "ngrok-skip-browser-warning": "true",
-
-          // Option 2 (optional): custom User-Agent (if you want to use this)
-          // 'User-Agent': 'MyCustomAgent/1.0',
-        },
-      });
-      return response.data;
-    } catch (err) {
-      console.error("Failed to fetch accounts via Backend", err);
-      // Fail gracefully
-      return [];
-    }
-  },
-
-  // // Get Accounts (Dropdown)
-  // getChartOfAccounts: async (): Promise<
-  //   { account_id: string; account_name: string }[]
-  // > => {
-  //   // Logic: If inside Zoho, ask Zoho for real accounts.
-  //   // If testing on localhost browser, return fake accounts.
-  //   if (isZoho()) {
-  //     try {
-  //       // Initialize might be needed depending on SDK version, safe to await
-  //       await window.ZFAPPS.extension.init();
-
-  //       const response = await window.ZFAPPS.get("chartofaccounts");
-  //       // Zoho returns object like { chartofaccounts: [...] }
-  //       console.log("Fetched accounts from Zoho:", response.data);
-  //       return response.chartofaccounts || [];
-  //     } catch (err) {
-  //       console.error("Failed to fetch accounts from Zoho", err);
-  //       return [];
-  //     }
-  //   } else {
-  //     // LOCAL MOCK DATA (For Demo/Testing outside iframe)
-  //     console.log("Using Mock Accounts (Localhost)");
-  //     return [
-  //       { account_id: "1", account_name: "Cost of Goods Sold" },
-  //       { account_id: "2", account_name: "Advertising & Marketing" },
-  //       { account_id: "3", account_name: "Meals and Entertainment" },
-  //       { account_id: "4", account_name: "Office Supplies" },
-  //       { account_id: "5", account_name: "Travel Expense" },
-  //     ];
-  //   }
-  // },
+    approveInvoice: async (data: any) => {
+        const response = await axios.post(`${API_BASE_URL}/accounting/approve`, data, axiosConfig); // <- MODIFIED
+        return response.data;
+    },
 };
