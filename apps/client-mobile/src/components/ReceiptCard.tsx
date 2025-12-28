@@ -16,7 +16,10 @@ export function ReceiptCard({ invoice }: { invoice: Invoice }) {
   // --- THE FIX IS HERE ---
   // We wrap invoice.id in String() to ensure it's a string before slicing.
   // We also provide a fallback || "" to handle nulls safely.
-  const displayId = String(invoice.id || "").toUpperCase() || "---";
+  const displayId =
+    String(invoice.id || "")
+      .slice(-6)
+      .toUpperCase() || "---";
 
   return (
     <div className="bg-white dark:bg-slate-800 p-4 mx-6 mb-3 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex gap-4 active:scale-[0.99] transition-transform">
