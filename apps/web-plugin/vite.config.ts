@@ -1,3 +1,5 @@
+// File: contracts/tax-demo-apps/zoho_accounting/apps/web-plugin/vite.config.ts
+
 import path from "path"
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
@@ -9,9 +11,10 @@ export default defineConfig({
   server: {
     allowedHosts: ["polemoniaceous-disclamatory-brett.ngrok-free.dev"],
   },
-  base: "/zoho_accounting/", // <--- ADD THIS LINE (Makes paths relative, e.g. "./script.js")
+  base: "/zoho_accounting/",
   build: {
-    outDir: "E:/project/receipt-monorepo/apps/web-plugin/dist",
+    // Use a relative path so it works everywhere
+    outDir: "dist", 
     emptyOutDir: true,
   },
   resolve: {

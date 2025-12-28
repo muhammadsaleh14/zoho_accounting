@@ -5,12 +5,11 @@ name: Deploy via Commit Message
 on:
   push:
     branches:
-      - main # Or your default branch
+      - main # This should be your main development branch
 
 jobs:
-  # This job builds and deploys BOTH applications if the commit message is correct
   build-and-deploy:
-    # IMPORTANT: This line makes the job run ONLY if the commit message contains "deploy:"
+    # This job will only run if the commit message contains the keyword "deploy:"
     if: contains(github.event.head_commit.message, 'deploy:')
     name: Build and Deploy Frontends
     runs-on: ubuntu-latest
@@ -18,7 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Set up Node.js v20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -29,44 +28,48 @@ jobs:
 
       - name: Extract Ngrok URL from commit message
         id: extract_url
-        # This command finds the URL in the commit message and saves it to a variable
         run: |
-          URL=$(echo "${{ github.event.head_commit.message }}" | grep -o 'https://[a-zA-Z0-9.-]*\.ngrok-free\.dev')
-          echo "NGROK_URL=$URL" >> $GITHUB_ENV
-          echo "Extracted URL: $URL"
+          # This robustly extracts the ngrok URL from the commit message.
+          # It specifically looks for the line starting with "deploy:"
+          URL=$(echo "${{ github.event.head_commit.message }}" | grep -i '^deploy:' | grep -o 'https://[a-zA-Z0-9.-]*\.ngrok-free\.app' | head -n 1)
 
-      # --- Build Web Plugin ---
+          if [[ -z "$URL" ]]; then
+            echo "::error::Could not find a valid ngrok URL in the commit message."
+            echo "::error::Please ensure your commit includes a line formatted exactly like: 'deploy: https://your-id.ngrok-free.app'"
+            exit 1
+          fi
+          
+          echo "NGROK_URL=$URL" >> $GITHUB_ENV
+          echo "✅ Successfully extracted URL: $URL"
+
+      # --- Build and Deploy Web Plugin ---
       - name: Replace API URL for Web Plugin
-        # Use the URL extracted in the previous step
-        run: |
-          sed -i "s|http://localhost:8000|${{ env.NGROK_URL }}|g" apps/web-plugin/src/config.ts
-          echo "API URL in web-plugin replaced."
+        run: sed -i "s|http://localhost:8000|${{ env.NGROK_URL }}|g" apps/web-plugin/src/config.ts
 
       - name: Build web-plugin application
-        run: yarn workspace @tax-demo-apps/web-plugin build
+        # ✅ CORRECTED: Uses the actual package name "web-plugin"
+        run: yarn workspace web-plugin build
 
       - name: Deploy Web Plugin to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./apps/web-plugin/dist
-          destination_dir: ./zoho_accounting
-          keep_files: true
+          destination_dir: ./zoho_accounting # Matches the 'base' in its vite.config.ts
+          keep_files: true # This is critical for monorepos
 
-      # --- Build Client Mobile ---
+      # --- Build and Deploy Client Mobile ---
       - name: Replace API URL for Client Mobile
-        # Use the same extracted URL
-        run: |
-          sed -i "s|http://localhost:8000|${{ env.NGROK_URL }}|g" apps/client-mobile/src/services/api.ts
-          echo "API URL in client-mobile replaced."
+        run: sed -i "s|http://localhost:8000|${{ env.NGROK_URL }}|g" apps/client-mobile/src/services/api.ts
 
       - name: Build client-mobile application
-        run: yarn workspace @tax-demo-apps/client-mobile build
+        # ✅ CORRECTED: Uses the actual package name "client-mobile"
+        run: yarn workspace client-mobile build
 
       - name: Deploy Client Mobile to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./apps/client-mobile/dist
-          destination_dir: ./zoho_accounting/mobile
+          destination_dir: ./zoho_accounting/mobile # Matches the 'base' in its vite.config.ts
           keep_files: true
