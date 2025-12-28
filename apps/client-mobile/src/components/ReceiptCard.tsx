@@ -1,44 +1,75 @@
 import type { Invoice } from "@receipt-app/shared";
-import { Clock, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Calendar, FileText, MoreHorizontal } from "lucide-react";
 
 export function ReceiptCard({ invoice }: { invoice: Invoice }) {
-  const isReview = invoice.status === "review";
-  const isApproved = invoice.status === "approved";
+  // Calculate progress based on status
+  // 1 = Uploaded, 2 = Reviewed, 3 = Synced
+  const progress =
+    invoice.status === "approved" || invoice.status === "synced"
+      ? 100
+      : invoice.status === "review"
+        ? 60
+        : 30;
+
+  const statusColor =
+    invoice.status === "approved" ? "bg-green-500" : "bg-amber-500";
 
   return (
-    <div className="bg-white p-4 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 flex items-center gap-4 mb-3 active:scale-[0.98] transition-transform">
-      {/* Icon Box */}
-      <div
-        className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-          isReview
-            ? "bg-amber-50 text-amber-600"
-            : isApproved
-              ? "bg-green-50 text-green-600"
-              : "bg-blue-50 text-blue-600"
-        }`}
-      >
-        {isReview && <AlertTriangle size={20} />}
-        {isApproved && <CheckCircle2 size={20} />}
-        {invoice.status === "queue" && <Clock size={20} />}
+    <div className="bg-surface-card p-4 mx-6 mb-3 rounded-2xl shadow-sm border border-surface-200 flex gap-4 active:scale-[0.99] transition-transform">
+      {/* Thumbnail */}
+      <div className="w-12 h-12 rounded-lg bg-surface-100 border border-surface-200 flex items-center justify-center shrink-0 relative overflow-hidden">
+        {invoice.image_url ? (
+          <img
+            src={invoice.image_url}
+            alt=""
+            className="w-full h-full object-cover opacity-80"
+          />
+        ) : (
+          <FileText size={20} className="text-surface-300" />
+        )}
+        {/* Status Indicator Dot */}
+        <div
+          className={`absolute top-1 right-1 w-2 h-2 rounded-full ${statusColor} border border-white`}
+        ></div>
       </div>
 
-      {/* Details */}
+      {/* Content */}
       <div className="flex-1 min-w-0">
-        <h3 className="font-bold text-gray-900 truncate text-[15px]">
-          {invoice.vendor}
-        </h3>
-        <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
-          <span>{invoice.date}</span>
-          <span>•</span>
-          <span className="capitalize">{invoice.status}</span>
+        <div className="flex justify-between items-start">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 truncate pr-2">
+              {invoice.vendor}
+            </h3>
+            <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+              #{invoice.id?.slice(-6).toUpperCase() || "PENDING"}
+            </p>
+          </div>
+          <p className="text-sm font-black text-slate-900">
+            {invoice.currency} {invoice.amount.toFixed(2)}
+          </p>
         </div>
-      </div>
 
-      {/* Amount */}
-      <div className="text-right">
-        <span className="block font-bold text-gray-900 text-[15px]">
-          {invoice.currency} {invoice.amount.toFixed(2)}
-        </span>
+        {/* Metadata & Progress */}
+        <div className="mt-3 flex items-end justify-between">
+          <div className="flex items-center gap-1 text-[10px] text-slate-500 font-medium">
+            <Calendar size={10} />
+            <span>{invoice.date || "No Date"}</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* The "Process Bar" */}
+            <div className="w-16 h-1.5 bg-surface-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full ${statusColor} transition-all duration-500`}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+
+            <button className="text-slate-300">
+              <MoreHorizontal size={16} />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
