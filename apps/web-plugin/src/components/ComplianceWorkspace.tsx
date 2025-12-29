@@ -1,15 +1,19 @@
-// File: apps/web-plugin/src/components/ComplianceWorkspace.tsx
 import { useState } from "react";
 import type { Invoice } from "@receipt-app/shared";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../services/api";
 import { ComplianceChecklist } from "./ComplianceChecklist";
-import { PinOff, Trash2, Plus, ArrowLeft,
+import {
+  Trash2,
+  Plus,
+  ArrowLeft,
   ZoomIn,
   ZoomOut,
   RotateCcw,
   Maximize,
   X,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { NgrokImage } from "./NgrokImage";
 import { BankStatementView } from "./BankStatementView";
@@ -29,37 +33,65 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const [scale, setScale] = useState(1); // 1 = 100%
+  const [scale, setScale] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImageCollapsed, setIsImageCollapsed] = useState(false);
 
   const [header, setHeader] = useState({
-    vendor: invoice.vendor,
-    billNumber: invoice.invoiceNumber || "",
-    orderNumber: "", // From AI if available
-    billDate: invoice.date,
-    dueDate: invoice.date,
-    subject: "",
-    adjustment: 0 as number | string,
+    // 1. VENDOR FIX: Check 'vendor_name_raw' (Backend) first
+    vendor: 
+      invoice.vendor_name_raw || 
+      invoice.vendorNameRaw || 
+      invoice.vendor?.name || 
+      "Unknown Vendor",
+    
+    // 2. BILL # FIX: Check 'invoice_number' (Backend)
+    billNumber: 
+      invoice.invoice_number || 
+      invoice.invoiceNumber || 
+      "", 
+    
+    // 3. ORDER # FIX: Check 'reference_number' (Backend)
+    orderNumber: 
+      invoice.reference_number || 
+      invoice.referenceNumber || 
+      "", 
+    
+    billDate: invoice.date || "",
+    dueDate: invoice.dueDate || invoice.date || "", 
+    
+    // Auto-fill subject based on vendor if available
+    subject: (invoice.vendor_name_raw || invoice.vendorNameRaw) 
+      ? `Bill from ${invoice.vendor_name_raw || invoice.vendorNameRaw}` 
+      : "",
+      
+    adjustment: invoice.adjustment || 0,
+    discount: invoice.discount || 0,
   });
 
-  const [lines, setLines] = useState(
-    invoice.line_items?.map((line) => ({
-      description: line.description,
-      accountId: line.accountId || "",
-      quantity: line.quantity || 1,
-      rate: line.rate || 0,
-      customerId: "", // Default empty
-    })) || [
-      {
-        description: "Extracted Item",
-        accountId: "",
-        quantity: 1,
-        rate: invoice.amount,
-        customerId: "",
-      },
-    ]
-  );
+  // --- LINE ITEMS MAPPING (Ensure snake_case fallback) ---
+  const rawLines = invoice.line_items || invoice.lineItems || [];
 
+  const [lines, setLines] = useState(
+    rawLines.length > 0
+      ? rawLines.map((line: any) => ({
+          description: line.description || "",
+          // Check all possible Account ID keys
+          accountId: line.accountId || line.zoho_account_id || line.account_id || "", 
+          quantity: line.quantity || 1,
+          rate: line.rate || 0,
+          customerId: line.customerId || line.customer_id || "", 
+        }))
+      : [
+          {
+            description: "Item Description",
+            accountId: "",
+            quantity: 1,
+            rate: invoice.amount || 0,
+            customerId: "",
+          },
+        ]
+  );
   const { data: accounts } = useQuery({
     queryKey: ["accounts"],
     queryFn: api.getChartOfAccounts,
@@ -67,18 +99,15 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
 
   const { data: customers } = useQuery<Customer[]>({
     queryKey: ["customers"],
-    queryFn: api.getCustomers, // Using dummy data for now
+    queryFn: api.getCustomers,
   });
 
+  // --- CALCULATIONS ---
   const subTotal = lines.reduce(
     (sum, line) => sum + line.quantity * line.rate,
     0
   );
-  const adjustmentVal =
-    typeof header.adjustment === "string"
-      ? parseFloat(header.adjustment) || 0
-      : header.adjustment;
-  const total = subTotal + adjustmentVal;
+  const total = subTotal + Number(header.adjustment) - Number(header.discount);
 
   const updateLine = (index: number, field: string, value: any) => {
     const newLines = [...lines];
@@ -102,7 +131,7 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
   const approveMutation = useMutation({
     mutationFn: api.approveInvoice,
     onSuccess: (data) => {
-      alert(`✅ Bill operation successful!`);
+      // alert(`✅ Bill operation successful!`);
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       onSuccess();
     },
@@ -117,15 +146,15 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
       return alert("All lines must have an Account selected");
 
     approveMutation.mutate({
-      // Map state to the payload your backend's /approve endpoint expects
       vendor_name: header.vendor,
       bill_number: header.billNumber,
       date: header.billDate,
       due_date: header.dueDate,
       order_number: header.orderNumber,
       subject: header.subject,
-      adjustment: adjustmentVal,
-      line_items: lines.map((l) => ({ ...l, account_id: l.accountId })), // map accountId to account_id
+      adjustment: header.adjustment,
+      discount: header.discount,
+      line_items: lines.map((l) => ({ ...l, account_id: l.accountId })),
       temp_file_path: invoice.image_url,
     });
   };
@@ -136,289 +165,388 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
 
   return (
     <>
+      {/* Fullscreen Modal for Image */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in">
           <button
             onClick={() => setIsModalOpen(false)}
-            className="absolute top-4 right-4 z-10 p-2 text-white/70 hover:text-white bg-black/20 rounded-full"
+            className="absolute top-4 right-4 z-10 p-2 text-white/70 hover:text-white bg-white/10 rounded-full"
           >
             <X size={24} />
           </button>
-          <div className="w-full h-full p-8 flex items-center justify-center">
-            <div className="w-full h-full overflow-auto">
-              <NgrokImage
-                src={invoice.image_url!}
-                className="max-w-none w-auto h-auto mx-auto" // Allows natural size and centering
-              />
-            </div>
+          <div className="w-full h-full p-4 overflow-auto flex justify-center">
+            <NgrokImage
+              src={invoice.image_url!}
+              className="max-w-none w-auto h-auto object-contain"
+            />
           </div>
         </div>
       )}
-        <div className="h-full w-full flex flex-col lg:flex-row relative bg-slate-100 overflow-hidden">
-        {/* Left Side: Image Viewer */}
-        <div className="w-full lg:w-1/2 bg-gray-900 flex flex-col">
-          <div className="p-3 bg-gray-800 border-b border-gray-700 flex items-center justify-between text-white">
-            <button
-              onClick={() => navigate("/")}
-              className="flex items-center gap-2 text-sm font-bold hover:opacity-80"
-            >
-              <ArrowLeft size={16} /> Back
-            </button>
+
+      {/* Main Layout: VERTICAL STACK */}
+      <div className="h-full w-full flex flex-col bg-slate-100 overflow-hidden">
+        {/* TOP SECTION: IMAGE VIEWER */}
+        <div
+          className={`w-full bg-slate-900 flex flex-col transition-all duration-300 ease-in-out border-b-4 border-brand-500
+            ${isImageCollapsed ? "h-12 shrink-0" : "h-[40vh] shrink-0"}`}
+        >
+          {/* Toolbar */}
+          <div className="p-2 bg-slate-800 border-b border-slate-700 flex items-center justify-between text-white shrink-0">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate("/")}
+                className="flex items-center gap-2 text-xs font-bold hover:text-brand-400 bg-white/5 px-3 py-1.5 rounded-md"
+              >
+                <ArrowLeft size={14} /> Back
+              </button>
+              <span className="text-xs text-slate-400 border-l border-slate-600 pl-3">
+                {invoice.vendorNameRaw} • {invoice.date}
+              </span>
+            </div>
+
             <div className="flex items-center gap-1">
+              {!isImageCollapsed && (
+                <>
+                  <button
+                    onClick={() => setScale((s) => s + 0.1)}
+                    className="p-1.5 rounded hover:bg-white/10"
+                    title="Zoom In"
+                  >
+                    <ZoomIn size={16} />
+                  </button>
+                  <button
+                    onClick={() => setScale((s) => Math.max(0.2, s - 0.1))}
+                    className="p-1.5 rounded hover:bg-white/10"
+                    title="Zoom Out"
+                  >
+                    <ZoomOut size={16} />
+                  </button>
+                  <button
+                    onClick={() => setScale(1)}
+                    className="p-1.5 rounded hover:bg-white/10"
+                    title="Reset"
+                  >
+                    <RotateCcw size={16} />
+                  </button>
+                  <div className="w-px h-4 bg-slate-600 mx-2"></div>
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="p-1.5 rounded hover:bg-white/10"
+                    title="Fullscreen"
+                  >
+                    <Maximize size={16} />
+                  </button>
+                </>
+              )}
+
               <button
-                onClick={() => setScale((s) => s + 0.2)}
-                className="p-2 rounded hover:bg-black/30" title="Zoom In"
+                onClick={() => setIsImageCollapsed(!isImageCollapsed)}
+                className="p-1.5 rounded hover:bg-white/10 ml-2"
+                title={isImageCollapsed ? "Show Image" : "Hide Image"}
               >
-                <ZoomIn size={16} />
-              </button>
-              <button
-                onClick={() => setScale((s) => Math.max(0.2, s - 0.2))}
-                className="p-2 rounded hover:bg-black/30" title="Zoom Out"
-              >
-                <ZoomOut size={16} />
-              </button>
-              <button
-                onClick={() => setScale(1)}
-                className="p-2 rounded hover:bg-black/30" title="Reset Zoom"
-              >
-                <RotateCcw size={16} />
-              </button>
-              <div className="w-px h-5 bg-gray-600 mx-2"></div>
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 rounded hover:bg-black/30" title="Expand View"
-              >
-                <Maximize size={16} />
+                {isImageCollapsed ? (
+                  <ChevronDown size={16} />
+                ) : (
+                  <ChevronUp size={16} />
+                )}
               </button>
             </div>
           </div>
 
-            <div className="flex-1 p-4 flex justify-center overflow-y-auto"> 
-            <NgrokImage
+          {/* Scrollable Image Area */}
+          {!isImageCollapsed && (
+            <div className="flex-1 overflow-auto bg-slate-900/50 p-4 flex justify-center items-start">
+              <NgrokImage
                 src={invoice.image_url}
-                className="max-w-full max-h-full object-contain shadow-2xl"
-                style={{ transform: `scale(${scale})`, transformOrigin: "top" }}
-            />
+                className="shadow-2xl transition-transform duration-200 origin-top"
+                style={{ transform: `scale(${scale})`, maxWidth: "100%" }}
+              />
             </div>
-            {invoice.compliance && (
-            <ComplianceChecklist data={invoice.compliance.checklist} />
-            )}
+          )}
         </div>
 
-        {/* Right Side: Zoho Form */}
-        <div className="w-full lg:w-1/2 bg-white flex flex-col">
-            <div className="flex-1 p-6 lg:p-8 overflow-y-auto">
-            <div className="max-w-2xl mx-auto">
-                {/* Header */}
-                <div className="grid grid-cols-12 gap-6 mb-6">
-                <div className="col-span-4">
-                    <label className="zoho-label">Vendor</label>
-                    <input
+        {/* BOTTOM SECTION: ZOHO FORM */}
+        <div className="flex-1 bg-white flex flex-col min-h-0 overflow-hidden relative z-10">
+          <div className="flex-1 overflow-y-auto p-4 lg:p-8 pb-24">
+            <div className="max-w-5xl mx-auto space-y-6">
+              {/* 1. Header Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 bg-slate-50 p-6 rounded-xl border border-slate-200">
+                {/* Vendor - Read Only */}
+                <div className="md:col-span-4">
+                  <label className="zoho-label">Vendor Name</label>
+                  <input
                     type="text"
                     value={header.vendor}
                     readOnly
-                    className="zoho-input bg-gray-100"
-                    />
+                    className="zoho-input bg-slate-200/50 text-slate-500 cursor-not-allowed font-semibold"
+                  />
+                  {/* Warning if unknown */}
+                  {header.vendor === "Unknown Vendor" && (
+                    <p className="text-[10px] text-red-500 mt-1 font-bold">
+                      ⚠️ Please verify vendor in Zoho
+                    </p>
+                  )}
                 </div>
-                <div className="col-span-8">
-                    <label className="zoho-label">Subject</label>
-                    <input
+
+                {/* Subject */}
+                <div className="md:col-span-8">
+                  <label className="zoho-label">Subject / Notes</label>
+                  <input
                     type="text"
                     value={header.subject}
                     onChange={(e) =>
-                        setHeader({ ...header, subject: e.target.value })
+                      setHeader({ ...header, subject: e.target.value })
                     }
                     className="zoho-input"
-                    />
+                    placeholder="Enter a description for this bill..."
+                  />
                 </div>
-                </div>
-                {/* Bill Details */}
-                <div className="grid grid-cols-4 gap-6 mb-8 bg-gray-50 p-4 rounded-lg border">
-                <div>
-                    <label className="zoho-label">Bill# *</label>
-                    <input
+
+                {/* Bill # */}
+                <div className="md:col-span-3">
+                  <label className="zoho-label text-brand-600">
+                    Bill Number *
+                  </label>
+                  <input
                     type="text"
                     value={header.billNumber}
                     onChange={(e) =>
-                        setHeader({ ...header, billNumber: e.target.value })
+                      setHeader({ ...header, billNumber: e.target.value })
                     }
-                    className="zoho-input"
-                    />
+                    className="zoho-input font-bold"
+                  />
                 </div>
-                <div>
-                    <label className="zoho-label">Order #</label>
-                    <input
+
+                {/* Order # */}
+                <div className="md:col-span-3">
+                  <label className="zoho-label">Order Number</label>
+                  <input
                     type="text"
                     value={header.orderNumber}
                     onChange={(e) =>
-                        setHeader({ ...header, orderNumber: e.target.value })
+                      setHeader({ ...header, orderNumber: e.target.value })
                     }
                     className="zoho-input"
-                    />
+                  />
                 </div>
-                <div>
-                    <label className="zoho-label">Bill Date</label>
-                    <input
+
+                {/* Dates */}
+                <div className="md:col-span-3">
+                  <label className="zoho-label">Bill Date</label>
+                  <input
                     type="date"
                     value={header.billDate}
                     onChange={(e) =>
-                        setHeader({ ...header, billDate: e.target.value })
+                      setHeader({ ...header, billDate: e.target.value })
                     }
                     className="zoho-input"
-                    />
+                  />
                 </div>
-                <div>
-                    <label className="zoho-label">Due Date</label>
-                    <input
+                <div className="md:col-span-3">
+                  <label className="zoho-label">Due Date</label>
+                  <input
                     type="date"
                     value={header.dueDate}
                     onChange={(e) =>
-                        setHeader({ ...header, dueDate: e.target.value })
+                      setHeader({ ...header, dueDate: e.target.value })
                     }
                     className="zoho-input"
-                    />
+                  />
                 </div>
-                </div>
-                {/* Line Items Table */}
-                <div className="border rounded-lg mb-4 overflow-hidden">
+              </div>
+
+              {/* 2. Line Items Table */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white">
                 <table className="w-full text-sm">
-                    <thead className="bg-gray-100 text-gray-600 uppercase text-xs">
+                  <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200">
                     <tr>
-                        <th className="p-3">Description</th> {/* Removed width to let it be flexible */}
-                        <th className="p-3 w-48">Account *</th> {/* A fixed width for the select dropdown */}
-                        <th className="p-3 w-24 text-right">Qty</th> {/* Increased to a fixed width */}
-                        <th className="p-3 w-28 text-right">Rate</th> {/* Increased to a fixed width */}
-                        <th className="p-3 w-40">Customer</th> {/* A fixed width for the select dropdown */}
-                        <th className="p-3 w-12"></th> {/* Fixed width for the delete icon */}
+                      <th className="p-4 text-left w-[35%]">
+                        Item Description
+                      </th>
+                      <th className="p-4 text-left w-[25%]">
+                        Account (Category){" "}
+                        <span className="text-red-500">*</span>
+                      </th>
+                      <th className="p-4 text-right w-[10%]">Qty</th>
+                      <th className="p-4 text-right w-[10%]">Rate</th>
+                      <th className="p-4 text-left w-[15%]">
+                        Customer (Billable)
+                      </th>
+                      <th className="p-4 w-[5%]"></th>
                     </tr>
-                    </thead>
-                    <tbody>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
                     {lines.map((line, i) => (
-                        <tr key={i}>
+                      <tr
+                        key={i}
+                        className="group hover:bg-slate-50/80 transition-colors"
+                      >
                         <td className="p-2">
-                            <input
+                          <input
                             type="text"
                             value={line.description}
                             onChange={(e) =>
-                                updateLine(i, "description", e.target.value)
+                              updateLine(i, "description", e.target.value)
                             }
-                            className="zoho-input border-0"
-                            />
+                            className="w-full bg-transparent p-2 outline-none font-medium text-slate-700 placeholder:text-slate-300"
+                            placeholder="Description..."
+                          />
                         </td>
                         <td className="p-2">
+                          <div className="relative">
                             <select
-                            value={line.accountId}
-                            onChange={(e) =>
+                              value={line.accountId}
+                              onChange={(e) =>
                                 updateLine(i, "accountId", e.target.value)
-                            }
-                            className="zoho-input"
+                              }
+                              className={`w-full p-2 rounded-lg border text-xs font-semibold outline-none appearance-none cursor-pointer transition-all
+                                ${line.accountId ? "bg-white border-slate-200 text-slate-900" : "bg-red-50 border-red-200 text-red-600"}`}
                             >
-                            <option value="">Select Account</option>
-                            {accounts?.map((a) => (
+                              <option value="">-- Select Account --</option>
+                              {accounts?.map((a) => (
                                 <option key={a.account_id} value={a.account_id}>
-                                {a.account_name}
+                                  {a.account_name} ({a.account_code})
                                 </option>
-                            ))}
+                              ))}
                             </select>
+                            {/* Visual indicator for smart guess */}
+                            {line.accountId && (
+                              <div className="absolute right-8 top-1/2 -translate-y-1/2 text-[9px] font-bold text-brand-600 bg-brand-50 px-1 rounded">
+                                AI MATCH
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="p-2">
-                            <input
+                          <input
                             type="number"
                             value={line.quantity}
                             onChange={(e) =>
-                                updateLine(
+                              updateLine(
                                 i,
                                 "quantity",
                                 parseFloat(e.target.value)
-                                )
+                              )
                             }
-                            className="zoho-input text-right"
-                            />
+                            className="w-full bg-transparent p-2 outline-none text-right font-mono text-slate-700"
+                          />
                         </td>
                         <td className="p-2">
-                            <input
+                          <input
                             type="number"
                             value={line.rate}
                             onChange={(e) =>
-                                updateLine(i, "rate", parseFloat(e.target.value))
+                              updateLine(i, "rate", parseFloat(e.target.value))
                             }
-                            className="zoho-input text-right"
-                            />
+                            className="w-full bg-transparent p-2 outline-none text-right font-mono text-slate-700"
+                          />
                         </td>
                         <td className="p-2">
-                            <select
+                          <select
                             value={line.customerId}
                             onChange={(e) =>
-                                updateLine(i, "customerId", e.target.value)
+                              updateLine(i, "customerId", e.target.value)
                             }
-                            className="zoho-input"
-                            >
+                            className="w-full bg-transparent p-2 outline-none text-slate-500 text-xs cursor-pointer"
+                          >
                             <option value="">-- None --</option>
                             {customers?.map((c) => (
-                                <option key={c.contact_id} value={c.contact_id}>
+                              <option key={c.contact_id} value={c.contact_id}>
                                 {c.contact_name}
-                                </option>
+                              </option>
                             ))}
-                            </select>
+                          </select>
                         </td>
-                        <td
-                            className="p-2 text-center text-gray-400 hover:text-red-500 cursor-pointer"
+                        <td className="p-2 text-center">
+                          <button
                             onClick={() => removeLine(i)}
-                        >
+                            className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-all opacity-0 group-hover:opacity-100"
+                          >
                             <Trash2 size={16} />
+                          </button>
                         </td>
-                        </tr>
+                      </tr>
                     ))}
-                    </tbody>
+                  </tbody>
                 </table>
-                <button
+                <div className="bg-slate-50 p-2 border-t border-slate-200">
+                  <button
                     onClick={addLine}
-                    className="m-2 text-xs font-bold text-blue-600 flex items-center gap-1"
-                >
-                    <Plus size={14} /> Add Line
-                </button>
+                    className="text-xs font-bold text-brand-600 hover:text-brand-800 flex items-center gap-1 px-2 py-1 rounded hover:bg-brand-50 transition-colors"
+                  >
+                    <Plus size={14} /> Add Line Item
+                  </button>
                 </div>
-                {/* Totals */}
-                <div className="flex justify-end">
-                <div className="w-1/2 bg-gray-50 p-4 rounded-lg border space-y-2">
-                    <div className="flex justify-between text-sm">
+              </div>
+
+              {/* 3. Totals Section */}
+              <div className="flex justify-end">
+                <div className="w-full md:w-1/3 bg-slate-50 p-6 rounded-xl border border-slate-200 space-y-3">
+                  <div className="flex justify-between text-sm text-slate-600">
                     <span>Sub Total</span>
-                    <span>{subTotal.toFixed(2)}</span>
+                    <span className="font-mono">{subTotal.toFixed(2)}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center text-sm text-slate-600">
+                    <span>Discount</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400">(-)</span>
+                      <input
+                        type="number"
+                        value={header.discount}
+                        onChange={(e) =>
+                          setHeader({ ...header, discount: e.target.value })
+                        }
+                        className="w-20 text-right bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none focus:border-brand-400"
+                      />
                     </div>
-                    <div className="flex justify-between items-center text-sm">
+                  </div>
+
+                  <div className="flex justify-between items-center text-sm text-slate-600 pb-3 border-b border-slate-200">
                     <span>Adjustment</span>
                     <input
-                        type="number"
-                        value={header.adjustment}
-                        onChange={(e) =>
+                      type="number"
+                      value={header.adjustment}
+                      onChange={(e) =>
                         setHeader({ ...header, adjustment: e.target.value })
-                        }
-                        className="w-20 text-right zoho-input"
+                      }
+                      className="w-20 text-right bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none focus:border-brand-400"
                     />
-                    </div>
-                    <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2">
-                    <span>Total</span>
-                    <span>{total.toFixed(2)}</span>
-                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-end">
+                    <span className="font-bold text-lg text-slate-900">
+                      Total (AED)
+                    </span>
+                    <span className="font-black text-2xl text-slate-900">
+                      {total.toFixed(2)}
+                    </span>
+                  </div>
                 </div>
-                </div>
+              </div>
             </div>
-            </div>
-            {/* Footer Actions */}
-            <div className="p-4 bg-white border-t flex justify-end gap-3">
-            <button className="px-6 py-2 border rounded hover:bg-gray-50">
-                Cancel
+          </div>
+
+          {/* Footer Actions */}
+          <div className="p-4 bg-white border-t border-slate-200 flex justify-end gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] sticky bottom-0 z-20">
+            <button
+              onClick={() => navigate("/")}
+              className="px-6 py-2.5 border border-slate-300 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              Cancel
             </button>
             <button
-                onClick={handleApprove}
-                disabled={approveMutation.isPending}
-                className="px-6 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 disabled:opacity-50"
+              onClick={handleApprove}
+              disabled={approveMutation.isPending}
+              className="premium-button-primary"
             >
-                {approveMutation.isPending ? "Processing..." : "Save as Open"}
+              {approveMutation.isPending
+                ? "Syncing..."
+                : "Approve & Push to Zoho"}
             </button>
-            </div>
+          </div>
         </div>
-        </div>
+      </div>
     </>
   );
 }

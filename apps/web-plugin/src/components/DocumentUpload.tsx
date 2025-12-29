@@ -31,6 +31,8 @@ export function DocumentUpload({ onClose }: DocumentUploadProps) {
       // Invalidate queries to refresh the dashboard/vault in the background
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
 
+      console.log("Upload successful:", data);
+
       // Redirect user to the review page for the newly uploaded doc
       // NOTE: Your backend needs to return the 'id' of the created document record.
       // We'll assume it does for now.

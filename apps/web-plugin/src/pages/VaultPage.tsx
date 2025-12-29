@@ -1,4 +1,3 @@
-// File: apps/web-plugin/src/pages/VaultPage.tsx
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -64,15 +63,34 @@ export function VaultPage() {
     },
   ];
 
+  // --- HELPER: Safely extract Vendor Name ---
+  const getVendorName = (doc: any) => {
+    // Check all possible variations from backend (snake_case, camelCase, or object)
+    return (
+      doc.vendor_name_raw ||
+      doc.vendorNameRaw ||
+      (typeof doc.vendor === "string" ? doc.vendor : doc.vendor?.name) ||
+      "Unknown Vendor"
+    );
+  };
+
   const filteredInvoices = invoices?.filter((doc) => {
+    // 1. Safely resolve Vendor Name
+    const vendorName = getVendorName(doc);
+
+    // 2. Safely resolve ID (convert number to string)
+    const docId = String(doc.id || "");
+
     const matchesSearch =
-      doc.vendor.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.id.toLowerCase().includes(searchQuery.toLowerCase());
+      vendorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      docId.toLowerCase().includes(searchQuery.toLowerCase());
+
     const matchesCategory =
       category === "all" ||
       (category === "invoices" && doc.category === "invoice") ||
       (category === "receipts" && doc.category === "bill") ||
       (category === "statements" && doc.category === "bank_statement");
+
     return matchesSearch && matchesCategory;
   });
 
@@ -248,8 +266,9 @@ export function VaultPage() {
                                   <FileText size={20} />
                                 </div>
                                 <div>
+                                  {/* USE HELPER FUNCTION HERE TOO */}
                                   <p className="text-sm font-bold text-slate-800">
-                                    {doc.vendor}
+                                    {getVendorName(doc)}
                                   </p>
                                   <p className="text-[10px] text-slate-400 font-medium">
                                     #{doc.id} • {doc.currency} {doc.amount}
