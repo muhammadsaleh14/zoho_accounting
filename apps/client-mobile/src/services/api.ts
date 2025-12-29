@@ -1,7 +1,12 @@
 import axios from "axios";
 import type { DocumentCategory, Invoice } from "@receipt-app/shared";
 
-export const API_BASE = "http://localhost:8000/api/v1";
+// --- CONFIGURATION ---
+// 1. SERVER_ROOT: Used to construct absolute image URLs (e.g., http://localhost:8000/images/...)
+// Note: If testing on Android Emulator, use "http://10.0.2.2:8000"
+// Note: If testing on Physical Device, use your PC's LAN IP "http://192.168.1.X:8000"
+export const SERVER_ROOT = "http://localhost:8000";
+export const API_BASE = `${SERVER_ROOT}/api/v1`;
 
 const axiosConfig = {
   headers: {
@@ -9,7 +14,32 @@ const axiosConfig = {
   },
 };
 
-// --- MOCK DATA FOR FALLBACK ---
+// --- ADAPTER: Transform Backend Data to Frontend UI Format ---
+const transformInvoice = (data: any): Invoice => {
+  return {
+    ...data,
+    // 1. Fix Vendor Name: Backend sends 'vendor_name_raw', UI expects 'vendor'
+    vendor: data.vendor_name_raw || data.vendor?.name || "Unknown Vendor",
+
+    // 2. Fix Image URL: Backend sends relative '/images/x.jpg', UI needs absolute 'http://...'
+    image_url: data.image_url
+      ? data.image_url.startsWith("http")
+        ? data.image_url
+        : `${SERVER_ROOT}${data.image_url}`
+      : "",
+
+    // 3. Fix Line Items: Ensure they exist and map keys if necessary
+    lineItems: data.line_items || data.lineItems || [],
+
+    // 4. Ensure Status is valid
+    status: data.status || "review",
+
+    // 5. Ensure Date string exists
+    date: data.date || new Date().toISOString().split("T")[0],
+  };
+};
+
+// --- MOCK DATA FOR OFFLINE FALLBACK ---
 const MOCK_INVOICES: Invoice[] = [
   {
     id: "99001",
@@ -53,7 +83,8 @@ export const api = {
         `${API_BASE}/documents/invoices`,
         axiosConfig
       );
-      return response.data;
+      // Run every item through the adapter
+      return response.data.map(transformInvoice);
     } catch (error) {
       console.warn(
         "⚠️ API Error (Connection Refused?). Rendering MOCK DATA for demo."
@@ -84,7 +115,9 @@ export const api = {
         formData,
         uploadConfig
       );
-      return response.data;
+
+      // Transform the single result
+      return transformInvoice(response.data);
     } catch (error) {
       console.warn("⚠️ Upload failed. Returning mock success for demo.");
       // Simulate a successful upload after a delay
@@ -100,7 +133,7 @@ export const api = {
             category: category,
             image_url: "",
             lineItems: [],
-          });
+          } as Invoice);
         }, 1500);
       });
     }

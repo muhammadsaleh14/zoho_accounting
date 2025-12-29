@@ -8,9 +8,9 @@ import {
 } from "@tanstack/react-query";
 import { Home, Settings, Plus, Search, FileText } from "lucide-react";
 import { api } from "./services/api";
-import type { DocumentCategory } from "@receipt-app/shared";
+import type { DocumentCategory, Invoice } from "@receipt-app/shared"; // Import Invoice
 
-// --- New High-Impact Components ---
+// Components
 import { HomeHeader } from "./components/HomeHeader";
 import { StatsCarousel } from "./components/StatsCarousel";
 import { ExpenseChart } from "./components/ExpenseChart";
@@ -22,6 +22,7 @@ import { ReceiptCard } from "./components/ReceiptCard";
 import { CategoryPicker } from "./components/CategoryPicker";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { SettingsPage } from "./pages/SettingsPage";
+import { DocumentDetailsPage } from "./pages/DocumentDetailsPage"; // New Import
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,9 @@ function MobileWallet() {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [lastUploadedData, setLastUploadedData] = useState<any>(null);
+
+  // New State for View Screen
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
   // Data
   const { data: invoices } = useQuery({
@@ -48,12 +52,10 @@ function MobileWallet() {
     onSuccess: (data) => {
       client.invalidateQueries({ queryKey: ["invoices"] });
       setLastUploadedData(data);
-      // Show success screen
       setShowSuccess(true);
     },
   });
 
-  // Handlers
   const handleCategorySelect = (category: DocumentCategory) => {
     setIsPickerOpen(false);
     if (fileInputRef.current) fileInputRef.current.click();
@@ -63,7 +65,7 @@ function MobileWallet() {
     if (e.target.files?.[0]) {
       uploadMutation.mutate({
         file: e.target.files[0],
-        category: "bill", // Defaulting for the demo flow
+        category: "bill",
       });
     }
     e.target.value = "";
@@ -71,7 +73,7 @@ function MobileWallet() {
 
   // --- RENDER LOGIC ---
 
-  // 1. Full Screen Overlays (The "Magic" Flow)
+  // 1. Overlays
   if (uploadMutation.isPending) return <AnalysisProgress />;
 
   if (showSuccess) {
@@ -80,13 +82,23 @@ function MobileWallet() {
         data={lastUploadedData}
         onDismiss={() => {
           setShowSuccess(false);
-          setActiveTab("vault"); // Auto-redirect to vault to see new item
+          setActiveTab("vault");
         }}
       />
     );
   }
 
-  // 2. Main Tab Content
+  // 2. Detail View (Highest Priority if selected)
+  if (selectedInvoice) {
+    return (
+      <DocumentDetailsPage
+        invoice={selectedInvoice}
+        onBack={() => setSelectedInvoice(null)}
+      />
+    );
+  }
+
+  // 3. Main Tabs
   const renderContent = () => {
     if (activeTab === "settings")
       return <SettingsPage onBack={() => setActiveTab("home")} />;
@@ -120,9 +132,13 @@ function MobileWallet() {
 
           <div className="mt-2">
             {invoices?.map((inv) => (
-              <ReceiptCard key={inv.id} invoice={inv} />
+              <ReceiptCard
+                key={inv.id}
+                invoice={inv}
+                // Handle Click
+                onClick={(clickedInv) => setSelectedInvoice(clickedInv)}
+              />
             ))}
-            {/* Empty State Spacer */}
             <div className="h-12" />
           </div>
         </div>
@@ -144,7 +160,7 @@ function MobileWallet() {
     <div className="min-h-screen bg-surface-50 font-sans">
       {renderContent()}
 
-      {/* --- Floating Bottom Navigation --- */}
+      {/* Navigation (Hide if viewing details, though conditional return above handles this) */}
       <div className="fixed bottom-6 left-6 right-6 h-16 bg-white/90 backdrop-blur-xl border border-white/20 rounded-2xl shadow-float flex items-center justify-between px-8 z-50">
         <button
           onClick={() => setActiveTab("home")}
