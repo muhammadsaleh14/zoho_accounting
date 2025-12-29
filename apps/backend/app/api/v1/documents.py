@@ -1,20 +1,22 @@
 import shutil
 import json
-from typing import List
-from app.crud import crud_vendor, crud_invoice
-from app.models.accounting import Invoice
 import os
 import time
-from typing import Optional
+from typing import List, Optional
+
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from sqlalchemy.orm import Session
+from pdf2image import convert_from_path
 
 from app.db.session import get_db
 from app.services.ai_extractor import analyze_document
-from app.crud import crud_vendor
-from app.schemas.unified import ExtractedData
+from app.crud import crud_vendor, crud_invoice
 from app.schemas.unified import ExtractedData, InvoiceResponse 
-from pdf2image import convert_from_path
+from app.models.accounting import Invoice
+
+# --- NEW IMPORTS FOR MOCK MODE ---
+from app.core.config import settings
+from app.services.mock_factory import mock_service
 
 router = APIRouter()
 
@@ -23,6 +25,13 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.get("/invoices", response_model=List[InvoiceResponse])
 def get_all_invoices(db: Session = Depends(get_db)):
+    # --- DEMO MODE CHECK ---
+    if settings.DEMO_MODE:
+        # Return the in-memory list from the factory
+        return mock_service.get_all_invoices()
+    # -----------------------
+
+    # Existing Real Logic
     db_invoices = crud_invoice.get_invoices(db)
     response_data = []
     for inv in db_invoices:
@@ -53,6 +62,16 @@ def get_invoice_by_id(invoice_id: int, db: Session = Depends(get_db)):
     """
     Fetches a single invoice by its database ID.
     """
+    # --- DEMO MODE CHECK ---
+    if settings.DEMO_MODE:
+        # In mock mode, the factory handles the lookup
+        invoice = mock_service.get_invoice_by_id(invoice_id)
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Mock Invoice not found")
+        return invoice
+    # -----------------------
+
+    # Existing Real Logic
     db_invoice = crud_invoice.get_invoice(db, invoice_id=invoice_id)
     if db_invoice is None:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -98,13 +117,12 @@ async def upload_document(
 ):
     """
     MODIFIED WORKFLOW:
-    1. Saves file.
-    2. Runs AI extraction.
-    3. Enriches data (Vendor Matching).
-    4. SAVES the initial result to the database with 'review' status.
-    5. Returns the newly created database record.
+    1. Saves file (Shared).
+    2. CHECK: If Demo Mode -> Use Mock Factory -> Return.
+    3. If Real Mode -> Run AI extraction -> DB Save -> Return.
     """
     
+    # --- SHARED: FILE SAVING LOGIC (Must happen for both modes) ---
     original_filename = f"{int(time.time())}_{file.filename}"
     original_filepath = os.path.join(UPLOAD_DIR, original_filename)
     
@@ -112,7 +130,7 @@ async def upload_document(
     with open(original_filepath, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # --- MODIFIED: PDF to Image Conversion Logic ---
+    # PDF to Image Conversion Logic (Shared)
     preview_image_filename = original_filename
     
     if file.content_type == "application/pdf":
@@ -130,13 +148,24 @@ async def upload_document(
                 print(f"✅  Conversion successful. Preview saved to {jpeg_filename}")
         except Exception as e:
             print(f"⚠️ PDF conversion failed: {e}. Using original file path.")
-            # If conversion fails, we'll fall back, but the image will likely be broken
-            # In a production app, you might replace it with a generic PDF icon URL
     
     # The URL for the database and frontend will always point to an image now
     image_url_for_db = f"/images/{preview_image_filename}"
-    # --- END OF MODIFICATION ---
+    # --- END SHARED LOGIC ---
+
+    # --- DEMO MODE CHECK ---
+    if settings.DEMO_MODE:
+        # Use the Mock Factory to generate a realistic response
+        # We pass the filename so the factory can choose data based on keywords (e.g. "Uber" vs "Hotel")
+        mock_data = await mock_service.process_upload(file.filename, category)
         
+        # IMPORTANT: Overwrite the generic image URL in the mock data with the REAL one we just saved
+        mock_data["image_url"] = image_url_for_db
+        
+        return mock_data
+    # -----------------------
+
+    # --- EXISTING REAL LOGIC ---
     with open(original_filepath, "rb") as f:
         file_bytes = f.read()
     
@@ -153,7 +182,7 @@ async def upload_document(
             extracted_data.vendor.is_new = False
             extracted_data.vendor.existing_id = existing_vendor.id
 
-    # --- NEW: Save the result to the database ---
+    # --- Save the result to the database ---
     try:
         invoice_data_for_db = {
             "vendor_id": extracted_data.vendor.existing_id if extracted_data.vendor else None,

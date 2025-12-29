@@ -1,11 +1,15 @@
-# backend/app/core/config.py
+# apps/backend/app/core/config.py
+
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Zoho Accounting AI"
     DATABASE_URL: str
     
-    # Keep your existing keys here too
+    # Toggle this to False when you want to use Real DB / Zoho / Gemini
+    DEMO_MODE: bool = True 
+
+    # Existing Keys
     GOOGLE_API_KEY: str | None = None
     ZOHO_CLIENT_ID: str | None = None
     ZOHO_CLIENT_SECRET: str | None = None

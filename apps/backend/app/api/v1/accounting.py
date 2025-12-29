@@ -6,13 +6,24 @@ from app.schemas.payables import BillApproveRequest
 from app.services.zoho import create_zoho_contact, create_zoho_bill, upload_attachment_to_bill, fetch_all_contacts
 from app.crud import crud_account, crud_vendor, crud_invoice
 
+# --- NEW IMPORTS FOR MOCK MODE ---
+from app.core.config import settings
+from app.services.mock_factory import mock_service
+
 router = APIRouter()
 
 @router.get("/customers")
 async def get_customers_from_zoho():
     """
-    Fetches all 'customer' type contacts from Zoho for billable expense dropdown.
+    Fetches all 'customer' type contacts.
+    If Demo Mode: Returns mock contacts.
+    If Real Mode: Fetches from Zoho API.
     """
+    # --- DEMO MODE CHECK ---
+    if settings.DEMO_MODE:
+        return await mock_service.get_customers()
+    # -----------------------
+
     try:
         customers = await fetch_all_contacts(contact_type="customer")
         return customers
@@ -20,11 +31,17 @@ async def get_customers_from_zoho():
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/accounts")
-def get_accounts(db: Session = Depends(get_db)):
+async def get_accounts(db: Session = Depends(get_db)):
     """
-    Returns the local list of accounts for the UI Dropdown.
-    Fast (ms), no API limits.
+    Returns the list of accounts for the UI Dropdown.
+    If Demo Mode: Returns a robust hardcoded Chart of Accounts.
+    If Real Mode: Returns accounts synced to the local DB.
     """
+    # --- DEMO MODE CHECK ---
+    if settings.DEMO_MODE:
+        return await mock_service.get_accounts()
+    # -----------------------
+
     accounts = crud_account.get_all_accounts(db)
     
     # Format for Frontend
@@ -46,12 +63,15 @@ async def approve_bill(
 ):
     """
     The 'Commit' Action.
-    1. Ensures Vendor exists in Zoho (creates if missing).
-    2. Creates Bill in Zoho.
-    3. Queues Attachment Upload.
-    4. Saves Audit Trail to Local DB.
+    If Demo Mode: Simulates network delay and updates status in memory.
+    If Real Mode: Creates Vendor & Bill in Zoho, uploads attachment, saves to DB.
     """
     
+    # --- DEMO MODE CHECK ---
+    if settings.DEMO_MODE:
+        return await mock_service.approve_invoice(data.bill_number)
+    # -----------------------
+
     # 1. VENDOR HANDLING
     # If the frontend didn't send a zoho_id, implies it's a NEW vendor
     final_zoho_vendor_id = data.zoho_vendor_id
