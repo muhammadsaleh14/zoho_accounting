@@ -8,7 +8,7 @@ export const api = {
   // 1. DOCUMENTS
   uploadReceipt: async (
     file: File,
-    category: string = "bill"
+    category: string = "invoice"
   ): Promise<Invoice> => {
     const formData = new FormData();
     formData.append("file", file);

@@ -1,8 +1,11 @@
+# --- File: apps/backend/app/api/v1/documents.py ---
+
 import shutil
 import json
 import os
 import time
 from typing import List, Optional
+from datetime import datetime
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -155,14 +158,52 @@ async def upload_document(
 
     # --- DEMO MODE CHECK ---
     if settings.DEMO_MODE:
-        # Use the Mock Factory to generate a realistic response
-        # We pass the filename so the factory can choose data based on keywords (e.g. "Uber" vs "Hotel")
-        mock_data = await mock_service.process_upload(file.filename, category)
+        print("🤖 [DEMO MODE] Using ai_extractor mock data for accuracy.")
+        with open(original_filepath, "rb") as f:
+            file_bytes = f.read()
+
+        extracted_data = await analyze_document(file_bytes, db, file.content_type)
         
-        # IMPORTANT: Overwrite the generic image URL in the mock data with the REAL one we just saved
-        mock_data["image_url"] = image_url_for_db
+        # Simulate vendor check
+        if extracted_data.vendor:
+            extracted_data.vendor.is_new = False
+            extracted_data.vendor.existing_id = 123 # Mock existing ID
         
-        return mock_data
+        # Manually construct a valid InvoiceResponse object from extracted data
+        response_data = {
+            "id": int(time.time()),
+            "vendor_id": extracted_data.vendor.existing_id if extracted_data.vendor else None,
+            "vendor_name_raw": extracted_data.vendor.name if extracted_data.vendor else "Unknown",
+            "date": extracted_data.date,
+            "due_date": extracted_data.date, # Default due date
+            "amount": extracted_data.total_amount,
+            "currency": extracted_data.currency,
+            "tax_amount": extracted_data.tax_amount,
+            "invoice_number": extracted_data.invoice_number,
+            "reference_number": extracted_data.reference_number,
+            "discount": extracted_data.discount,
+            "adjustment": 0.0,
+            "status": "review",
+            "category": extracted_data.category,
+            "image_url": image_url_for_db,
+            "compliance_data": extracted_data.compliance.model_dump() if extracted_data.compliance else None,
+            "zoho_bill_id": None,
+            "created_at": datetime.now(),
+            "line_items": [
+                {
+                    "id": item_idx + 1,
+                    "description": item.description,
+                    "quantity": item.quantity,
+                    "rate": item.rate,
+                    "zoho_account_id": item.accountId
+                } for item_idx, item in enumerate(extracted_data.line_items)
+            ]
+        }
+        
+        # Add to the in-memory DB for the GET /invoices call to work
+        mock_service.get_all_invoices().insert(0, response_data)
+
+        return response_data
     # -----------------------
 
     # --- EXISTING REAL LOGIC ---

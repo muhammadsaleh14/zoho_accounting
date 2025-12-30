@@ -1,3 +1,5 @@
+# --- File: apps/backend/app/schemas/payables.py ---
+
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
@@ -13,29 +15,30 @@ class BillLineCreate(BaseModel):
 
 # 2. The Main Request Object (Updated with "New Bill" fields)
 class BillApproveRequest(BaseModel):
-    # Vendor Info
-    vendor_name: str
-    zoho_vendor_id: Optional[str] = None 
-    vendor_trn: Optional[str] = None 
-    vendor_address: Optional[str] = None
+    # --- FIXED: ADDED ID and CATEGORY FOR CONTEXT ---
+    id: int # The local database ID of the document being processed
+    category: str # "bill" or "invoice"
+    
+    # Vendor/Customer Info - Renamed for generic use
+    contact_name: str 
+    zoho_contact_id: Optional[str] = None 
+    contact_trn: Optional[str] = None 
+    contact_address: Optional[str] = None
 
-    # Core Bill Info
+    # Core Bill/Invoice Info
     bill_number: str
     date: str           # YYYY-MM-DD
     due_date: str       # YYYY-MM-DD
     
-    # NEW: Full Zoho Fields
+    # Full Zoho Fields
     order_number: Optional[str] = None # Maps to reference_number
-    subject: Optional[str] = None      # Maps to notes (or part of notes)
+    subject: Optional[str] = None      # Maps to notes
     
     # Financials
-    adjustment: float = 0.0            # +/- Adjustment
-    discount: float = 0.0              # Global Discount Amount
+    adjustment: float = 0.0
+    discount: float = 0.0
+    tax_amount: float = 0.0 # Added tax amount for payload
     
-    # Note: TDS/TCS are complex tax objects. 
-    # We omit them from the strict schema for now to avoid validation errors, 
-    # but the logic allows expanding later.
-
     line_items: List[BillLineCreate]
     
     # Attachments

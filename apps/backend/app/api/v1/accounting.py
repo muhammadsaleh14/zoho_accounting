@@ -1,12 +1,13 @@
+# --- File: apps/backend/app/api/v1/accounting.py ---
+
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.payables import BillApproveRequest
-from app.services.zoho import create_zoho_contact, create_zoho_bill, upload_attachment_to_bill, fetch_all_contacts
+from app.services.zoho import create_zoho_contact, create_zoho_bill_or_invoice, upload_attachment_to_bill, fetch_all_contacts
 from app.crud import crud_account, crud_vendor, crud_invoice
 
-# --- NEW IMPORTS FOR MOCK MODE ---
 from app.core.config import settings
 from app.services.mock_factory import mock_service
 
@@ -14,16 +15,8 @@ router = APIRouter()
 
 @router.get("/customers")
 async def get_customers_from_zoho():
-    """
-    Fetches all 'customer' type contacts.
-    If Demo Mode: Returns mock contacts.
-    If Real Mode: Fetches from Zoho API.
-    """
-    # --- DEMO MODE CHECK ---
     if settings.DEMO_MODE:
         return await mock_service.get_customers()
-    # -----------------------
-
     try:
         customers = await fetch_all_contacts(contact_type="customer")
         return customers
@@ -32,144 +25,102 @@ async def get_customers_from_zoho():
 
 @router.get("/accounts")
 async def get_accounts(db: Session = Depends(get_db)):
-    """
-    Returns the list of accounts for the UI Dropdown.
-    If Demo Mode: Returns a robust hardcoded Chart of Accounts.
-    If Real Mode: Returns accounts synced to the local DB.
-    """
-    # --- DEMO MODE CHECK ---
     if settings.DEMO_MODE:
         return await mock_service.get_accounts()
-    # -----------------------
 
     accounts = crud_account.get_all_accounts(db)
-    
-    # Format for Frontend
     return [
         {
-            "account_id": acc.zoho_id, # Frontend needs the Zoho ID to send back
+            "account_id": acc.zoho_id,
             "account_name": acc.name,
             "account_code": acc.code,
             "type": acc.account_type
-        }
-        for acc in accounts
+        } for acc in accounts
     ]
 
 @router.post("/approve")
-async def approve_bill(
+async def approve_document(
     data: BillApproveRequest, 
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
-    """
-    The 'Commit' Action.
-    If Demo Mode: Simulates network delay and updates status in memory.
-    If Real Mode: Creates Vendor & Bill in Zoho, uploads attachment, saves to DB.
-    """
-    
-    # --- DEMO MODE CHECK ---
     if settings.DEMO_MODE:
+        # Simulate a successful Zoho sync for the demo
         return await mock_service.approve_invoice(data.bill_number)
-    # -----------------------
 
-    # 1. VENDOR HANDLING
-    # If the frontend didn't send a zoho_id, implies it's a NEW vendor
-    final_zoho_vendor_id = data.zoho_vendor_id
+    # Differentiate between sales invoice and vendor bill
+    is_sales_invoice = data.category == "invoice"
     
-    if not final_zoho_vendor_id:
-        print(f"🆕 Creating new Vendor in Zoho: {data.vendor_name}")
+    # 1. CONTACT HANDLING (Vendor or Customer)
+    final_contact_id = data.zoho_contact_id
+    if not final_contact_id:
+        contact_type_str = "Customer" if is_sales_invoice else "Vendor"
+        print(f"🆕 Creating new {contact_type_str} in Zoho: {data.contact_name}")
         try:
-            new_contact = await create_zoho_contact(
-                name=data.vendor_name,
-                trn=data.vendor_trn,
-                address=data.vendor_address
-            )
-            final_zoho_vendor_id = new_contact["contact_id"]
-            
-            # Upsert into Local DB so next time we find it
-            crud_vendor.create_vendor(
-                db, 
-                name=data.vendor_name, 
-                zoho_id=final_zoho_vendor_id,
-                trn=data.vendor_trn,
-                address=data.vendor_address
-            )
+            new_contact = await create_zoho_contact(name=data.contact_name, trn=data.contact_trn, address=data.contact_address)
+            final_contact_id = new_contact["contact_id"]
+            # You would also save this new contact to your local DB here
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Failed to create Vendor: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Failed to create {contact_type_str}: {str(e)}")
 
-    # 2. CONSTRUCT ZOHO BILL PAYLOAD
+    # 2. CONSTRUCT ZOHO PAYLOAD
     zoho_lines = []
     for item in data.line_items:
         line_obj = {
             "account_id": item.account_id,
             "description": item.description,
             "rate": item.rate,
-            "quantity": item.quantity
+            "quantity": item.quantity,
+            # FIXED: Add tax ID if tax amount exists.
+            # NOTE: Replace 'YOUR_ZOHO_VAT_5_ID' with the actual ID from your Zoho settings for 5% VAT.
+            "tax_id": "YOUR_ZOHO_VAT_5_ID" if data.tax_amount > 0 else ""
         }
-        # NEW: Add Customer ID if present (Billable)
-        if item.customer_id:
-            line_obj["customer_id"] = item.customer_id
-            
+        if is_sales_invoice and item.customer_id:
+             line_obj["customer_id"] = item.customer_id
         zoho_lines.append(line_obj)
         
-    bill_payload = {
-        "vendor_id": final_zoho_vendor_id,
-        "bill_number": data.bill_number,
+    payload = {
+        "line_items": zoho_lines,
         "date": data.date,
         "due_date": data.due_date,
-        
-        # NEW: Map the specific fields
-        "reference_number": data.order_number or "",  # Maps "Order Number"
-        "notes": data.subject or "",                  # Maps "Subject"
-        "adjustment": data.adjustment,                # Maps "Adjustment"
-        "discount": data.discount,                    # Maps "Discount"
-        
-        "line_items": zoho_lines
+        "reference_number": data.order_number or "",
+        "notes": data.subject or "",
+        "adjustment": data.adjustment,
+        "discount": data.discount,
     }
-    # 3. CREATE BILL IN ZOHO
+
+    if is_sales_invoice:
+        payload["customer_id"] = final_contact_id
+        payload["invoice_number"] = data.bill_number # Zoho calls it invoice_number
+    else:
+        payload["vendor_id"] = final_contact_id
+        payload["bill_number"] = data.bill_number
+
+    # 3. CREATE DOCUMENT IN ZOHO
     try:
-        print(f"🚀 Pushing Bill {data.bill_number} to Zoho...")
-        created_bill = await create_zoho_bill(bill_payload)
-        zoho_bill_id = created_bill["bill_id"]
-        print(f"✅ Bill Created! ID: {zoho_bill_id}")
+        print(f"🚀 Pushing {data.category} {data.bill_number} to Zoho...")
+        created_doc = await create_zoho_bill_or_invoice(payload, data.category)
+        doc_id_key = "invoice_id" if is_sales_invoice else "bill_id"
+        zoho_doc_id = created_doc[doc_id_key]
+        print(f"✅ Document Created! ID: {zoho_doc_id}")
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # 4. HANDLE ATTACHMENT (Background Task)
-    # We don't make the user wait for the file upload
+    # 4. ATTACHMENT (Background Task)
     if data.temp_file_path:
-        background_tasks.add_task(upload_attachment_to_bill, zoho_bill_id, data.temp_file_path)
+        background_tasks.add_task(upload_attachment_to_bill, zoho_doc_id, data.temp_file_path)
 
-    # 5. SAVE AUDIT TRAIL TO LOCAL DB
-    # We store the final state
-    invoice_data = {
-        "vendor_name_raw": data.vendor_name, # Snapshot name
-        "date": data.date,
-        "due_date": data.due_date,
-        "invoice_number": data.bill_number,
-        "amount": created_bill.get("total", 0),
-        "status": "synced",
-        "category": "bill",
-        "image_url": data.temp_file_path or "",
-        "zoho_bill_id": zoho_bill_id
-    }
-    
-    # We map the lines slightly differently for local storage (schema mismatch handling)
-    # In a real app, you'd make schemas match perfectly.
-    local_lines = []
-    for item in data.line_items:
-        local_lines.append({
-            "description": item.description,
-            "quantity": item.quantity,
-            "rate": item.rate,
-            "accountId": item.account_id
-        })
-        
-    crud_invoice.create_invoice_with_lines(db, invoice_data, local_lines)
+    # 5. SAVE/UPDATE LOCAL DB
+    # Find the local invoice and update its status and Zoho ID
+    local_invoice = crud_invoice.get_invoice(db, invoice_id=data.id) # Assuming frontend sends local DB id
+    if local_invoice:
+        local_invoice.status = "synced"
+        local_invoice.zoho_bill_id = zoho_doc_id # Use one field for both IDs
+        db.commit()
 
     return {
         "status": "success",
-        "message": "Bill approved and synced",
-        "zoho_bill_id": zoho_bill_id,
-        "vendor_id": final_zoho_vendor_id
+        "message": f"{data.category.capitalize()} synced to Zoho",
+        "zoho_id": zoho_doc_id,
+        "contact_id": final_contact_id
     }

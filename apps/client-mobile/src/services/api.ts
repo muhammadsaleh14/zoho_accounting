@@ -1,3 +1,5 @@
+// --- File: apps/client-mobile/src/services/api.ts ---
+
 import axios from "axios";
 import type { DocumentCategory, Invoice } from "@receipt-app/shared";
 
@@ -39,43 +41,6 @@ const transformInvoice = (data: any): Invoice => {
   };
 };
 
-// --- MOCK DATA FOR OFFLINE FALLBACK ---
-const MOCK_INVOICES: Invoice[] = [
-  {
-    id: "99001",
-    vendor: "Demo Vendor LLC",
-    date: "2025-01-15",
-    amount: 1250.0,
-    currency: "AED",
-    status: "review",
-    category: "bill",
-    image_url: "",
-    lineItems: [],
-  },
-  {
-    id: "99002",
-    vendor: "Starbucks Coffee",
-    date: "2025-01-14",
-    amount: 25.5,
-    currency: "AED",
-    status: "approved",
-    category: "bill",
-    image_url: "",
-    lineItems: [],
-  },
-  {
-    id: "99003",
-    vendor: "Emirates Airlines",
-    date: "2025-01-10",
-    amount: 4500.0,
-    currency: "AED",
-    status: "synced",
-    category: "bill",
-    image_url: "",
-    lineItems: [],
-  },
-];
-
 export const api = {
   getInvoices: async (): Promise<Invoice[]> => {
     try {
@@ -86,11 +51,12 @@ export const api = {
       // Run every item through the adapter
       return response.data.map(transformInvoice);
     } catch (error) {
-      console.warn(
-        "⚠️ API Error (Connection Refused?). Rendering MOCK DATA for demo."
+      console.error(
+        "API Error: Could not connect to the backend.",
+        error
       );
-      // Return mock data so the UI shows something beautiful instead of crashing
-      return MOCK_INVOICES;
+      // FIXED: Return an empty array on error instead of faulty mock data.
+      return [];
     }
   },
 
@@ -119,23 +85,9 @@ export const api = {
       // Transform the single result
       return transformInvoice(response.data);
     } catch (error) {
-      console.warn("⚠️ Upload failed. Returning mock success for demo.");
-      // Simulate a successful upload after a delay
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({
-            id: `temp_${Date.now()}`,
-            vendor: "Uploaded Receipt (Offline Mode)",
-            date: new Date().toISOString().split("T")[0],
-            amount: 0.0,
-            currency: "AED",
-            status: "review",
-            category: category,
-            image_url: "",
-            lineItems: [],
-          } as Invoice);
-        }, 1500);
-      });
+        console.error("Upload failed:", error);
+        // FIXED: Throw an error to let the UI handle it, rather than returning bad mock data.
+        throw new Error("File upload failed. Please ensure the backend server is running.");
     }
   },
 

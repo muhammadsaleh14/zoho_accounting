@@ -1,3 +1,5 @@
+# --- File: apps/backend/app/services/ai_extractor.py ---
+
 import json
 from sqlalchemy.orm import Session
 from google import genai
@@ -13,12 +15,13 @@ def get_mock_analysis_data():
     for the sample invoice (INV-2025-0012.pdf).
     """
     return {
-      "category": "bill",
-      "confidence_score": 0.98,
+      "category": "invoice", # CORRECTED: Now a sales invoice
+      "confidence_score": 0.99,
+      # For a sales invoice, vendor_data represents the CUSTOMER being billed
       "vendor_data": {
-        "name": "ABC Trading LLC",
-        "trn": "100123456700003",
-        "address": "Office 1203, Sheikh Zayed Road, Dubai, UAE"
+        "name": "XYZ Solutions FZC",
+        "trn": "100987654300003",
+        "address": "Warehouse 8, Sharjah, UAE"
       },
       "header": {
         "date": "2025-01-15",
@@ -27,26 +30,26 @@ def get_mock_analysis_data():
         "currency": "AED",
         "total": 5250.00,
         "tax": 250.00,
-        "discount": 0.0,
-        "opening_balance": None,
-        "closing_balance": None
+        "discount": 0.0
       },
       "lines": [
         {
           "description": "XYZ item",
           "quantity": 1.0,
           "rate": 5000.00,
-          # This is our simulated AI category prediction
-          "expense_category": "General & Administrative Expenses"
+          # AI predicts the correct revenue account for a sales invoice
+          "expense_category": "Sales"
         }
       ],
       "compliance": {
-        "isCompliant": True, # The invoice is fully compliant
-        "missingFields": [], # No missing fields
+        "isCompliant": True,
+        "missingFields": [],
         "details": {
           "taxInvoiceLabel": True,
           "supplierName": True,
           "supplierTRN": True,
+          "customerName": True,
+          "customerTRN": True,
           "invoiceDate": True,
           "lineItemsDetailed": True,
           "vatAmountShown": True,
@@ -93,17 +96,18 @@ async def analyze_document(file_bytes: bytes, db: Session, mime_type: str = "ima
         raw_lines = raw_data.get("lines", [])
         clean_lines = []
         for item in raw_lines:
+            matched_account_id = "123123" 
             qty = normalize_float(item.get("quantity", 1))
             rate = normalize_float(item.get("rate", 0))
             if qty == 0: qty = 1.0
-            ai_category_guess = item.get("expense_category")
+            # ai_category_guess = item.get("expense_category")
             
             # This part still hits the DB to simulate matching the AI category to a real account
-            matched_account_id = None
-            if ai_category_guess:
-                account = crud_account.get_account_by_name_match(db, ai_category_guess)
-                if account:
-                    matched_account_id = account.zoho_id
+            # matched_account_id = None
+            # if ai_category_guess:
+            #     account = crud_account.get_account_by_name_match(db, ai_category_guess)
+            #     if account:
+            #         matched_account_id = account.zoho_id
             
             clean_lines.append(LineItemBase(
                 description=item.get("description") or "Item",

@@ -23,6 +23,9 @@ class MockDataFactory:
         """Returns a static robust Chart of Accounts."""
         await asyncio.sleep(0.5) 
         return [
+            # ADDED SALES ACCOUNT FOR THE DEMO
+            {"account_id": "123123", "account_name": "Some Custom Account", "account_code": "CUSTOM-01", "type": "expense"},
+            {"account_id": "40001", "account_name": "Sales", "account_code": "4000", "type": "income"},
             {"account_id": "99001", "account_name": "Advertising & Marketing", "account_code": "6001", "type": "expense"},
             {"account_id": "99002", "account_name": "Meals & Entertainment", "account_code": "6005", "type": "expense"},
             {"account_id": "99003", "account_name": "Office Supplies", "account_code": "6010", "type": "expense"},
@@ -33,12 +36,16 @@ class MockDataFactory:
 
     async def get_customers(self):
         # ... (Existing customer logic) ...
+        # ADDED THE CUSTOMER FROM THE PDF
         return [
             {"contact_id": "88001", "contact_name": "Acme Corp (Client)"},
             {"contact_id": "88002", "contact_name": "Globex Inc"},
+            {"contact_id": "88003", "contact_name": "XYZ Solutions FZC"},
         ]
 
     async def process_upload(self, file_name: str, category: str):
+        # This function is now only a fallback and is overridden by the more accurate
+        # ai_extractor mock for the /upload endpoint. Keeping it for other potential uses.
         print(f"🔮 [MOCK] Analyzing {file_name}...")
         await asyncio.sleep(2.0) 
 
