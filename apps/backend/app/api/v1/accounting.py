@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.services.mock_factory import mock_service
 
 router = APIRouter()
+REAL_ZOHO_TAX_5_ID="8057952000000107011"
 
 @router.get("/customers")
 async def get_customers_from_zoho():
@@ -44,83 +45,67 @@ async def approve_document(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
-    if settings.DEMO_MODE:
-        # Simulate a successful Zoho sync for the demo
-        return await mock_service.approve_invoice(data.bill_number)
+    print(f"🚀 Approval triggered for {data.contact_name} (Mock Data -> Real Zoho)")
+    mock_service.approve_invoice(data.bill_number)
 
-    # Differentiate between sales invoice and vendor bill
-    is_sales_invoice = data.category == "invoice"
-    
-    # 1. CONTACT HANDLING (Vendor or Customer)
-    final_contact_id = data.zoho_contact_id
-    if not final_contact_id:
-        contact_type_str = "Customer" if is_sales_invoice else "Vendor"
-        print(f"🆕 Creating new {contact_type_str} in Zoho: {data.contact_name}")
-        try:
-            new_contact = await create_zoho_contact(name=data.contact_name, trn=data.contact_trn, address=data.contact_address)
-            final_contact_id = new_contact["contact_id"]
-            # You would also save this new contact to your local DB here
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Failed to create {contact_type_str}: {str(e)}")
-
-    # 2. CONSTRUCT ZOHO PAYLOAD
+    # 1. PREPARE THE PAYLOAD
+    # We use the data sent from the frontend (which is currently your hardcoded 123123)
     zoho_lines = []
     for item in data.line_items:
-        line_obj = {
-            "account_id": item.account_id,
+        zoho_lines.append({
+            "account_id": item.account_id, # This will be '123123'
             "description": item.description,
             "rate": item.rate,
             "quantity": item.quantity,
-            # FIXED: Add tax ID if tax amount exists.
-            # NOTE: Replace 'YOUR_ZOHO_VAT_5_ID' with the actual ID from your Zoho settings for 5% VAT.
-            "tax_id": "YOUR_ZOHO_VAT_5_ID" if data.tax_amount > 0 else ""
-        }
-        if is_sales_invoice and item.customer_id:
-             line_obj["customer_id"] = item.customer_id
-        zoho_lines.append(line_obj)
+            "tax_id": REAL_ZOHO_TAX_5_ID,
+        })
         
     payload = {
-        "line_items": zoho_lines,
         "date": data.date,
         "due_date": data.due_date,
-        "reference_number": data.order_number or "",
-        "notes": data.subject or "",
-        "adjustment": data.adjustment,
-        "discount": data.discount,
+        "line_items": zoho_lines,
+        "notes": data.subject,
+        "reference_number": data.order_number
     }
 
-    if is_sales_invoice:
+    # 2. CONTACT HANDLING
+    # Important: Zoho needs a REAL internal Contact ID. 
+    # If your hardcoded data doesn't have a real Zoho ID, we force a search/create.
+    final_contact_id = data.zoho_contact_id
+    
+    # If the contact is mock (no real ID), we try to create it in Zoho so the bill doesn't fail
+    if not final_contact_id or final_contact_id == "null":
+        print(f"Creating real contact in Zoho for: {data.contact_name}")
+        try:
+            new_contact = await create_zoho_contact(
+                name=data.contact_name, 
+                trn=data.contact_trn, 
+                address=data.contact_address
+            )
+            final_contact_id = new_contact["contact_id"]
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Contact error: {str(e)}")
+
+    # 3. SET THE CORRECT CONTACT FIELD
+    if data.category == "invoice":
         payload["customer_id"] = final_contact_id
-        payload["invoice_number"] = data.bill_number # Zoho calls it invoice_number
+        # payload["invoice_number"] = data.bill_number
     else:
         payload["vendor_id"] = final_contact_id
         payload["bill_number"] = data.bill_number
 
-    # 3. CREATE DOCUMENT IN ZOHO
+    # 4. THE REAL PUSH TO ZOHO
+    # Even if settings.DEMO_MODE is True, we run this to perform the real sync
     try:
-        print(f"🚀 Pushing {data.category} {data.bill_number} to Zoho...")
-        created_doc = await create_zoho_bill_or_invoice(payload, data.category)
-        doc_id_key = "invoice_id" if is_sales_invoice else "bill_id"
-        zoho_doc_id = created_doc[doc_id_key]
-        print(f"✅ Document Created! ID: {zoho_doc_id}")
+        print("📡 Communicating with Zoho APIs...")
+        result = await create_zoho_bill_or_invoice(payload, data.category)
+        
+        return {
+            "status": "success",
+            "message": "Real Zoho Sync Successful using Mock Data",
+            "zoho_id": result.get("bill_id") or result.get("invoice_id")
+        }
     except Exception as e:
+        # If it fails (likely due to invalid Account ID), we catch it here
+        print(f"❌ Zoho Sync Failed: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
-
-    # 4. ATTACHMENT (Background Task)
-    if data.temp_file_path:
-        background_tasks.add_task(upload_attachment_to_bill, zoho_doc_id, data.temp_file_path)
-
-    # 5. SAVE/UPDATE LOCAL DB
-    # Find the local invoice and update its status and Zoho ID
-    local_invoice = crud_invoice.get_invoice(db, invoice_id=data.id) # Assuming frontend sends local DB id
-    if local_invoice:
-        local_invoice.status = "synced"
-        local_invoice.zoho_bill_id = zoho_doc_id # Use one field for both IDs
-        db.commit()
-
-    return {
-        "status": "success",
-        "message": f"{data.category.capitalize()} synced to Zoho",
-        "zoho_id": zoho_doc_id,
-        "contact_id": final_contact_id
-    }

@@ -16,6 +16,10 @@ import {
   ChevronDown,
   ChevronUp,
   UserCheck,
+  AlertCircle,
+  CheckCircle2,
+  XCircle,
+  ShieldAlert
 } from "lucide-react";
 import { NgrokImage } from "./NgrokImage";
 import { BankStatementView } from "./BankStatementView";
@@ -30,6 +34,40 @@ interface Customer {
   contact_id: string;
   contact_name: string;
 }
+
+/**
+ * Compact Compliance Indicator component used inside the Top Bar
+ */
+const ComplianceChecklist = ({ data }: { data: any }) => {
+  if (!data?.details) return null;
+
+  const checks = [
+    { key: "taxInvoiceLabel", label: "Label" },
+    { key: "supplierTRN", label: "TRN" },
+    { key: "vatAmountShown", label: "VAT Breakdown" },
+  ];
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {checks.map((c) => {
+        const passed = data.details[c.key];
+        return (
+          <div 
+            key={c.key} 
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold border transition-all ${
+              passed 
+                ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
+                : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
+            }`}
+          >
+            {passed ? <CheckCircle2 size={12}/> : <XCircle size={12}/>}
+            {c.label}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
   const queryClient = useQueryClient();
@@ -53,10 +91,11 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
   });
 
   const rawLines = invoice.line_items || invoice.lineItems || [];
+  
+  // PRE-FILL LOGIC: This uses the accountId hardcoded in ai_extractor (e.g. 123123)
   const [lines, setLines] = useState(
     rawLines.map((line: any) => ({
       description: line.description || "",
-      // This now correctly uses the pre-filled ID from the backend for the initial state
       accountId: line.accountId || line.zoho_account_id || "", 
       quantity: line.quantity || 1,
       rate: line.rate || 0,
@@ -87,7 +126,7 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       onSuccess();
     },
-    onError: (error) => alert(`❌ Zoho Sync Error: ${error.message}`),
+    onError: (error: any) => alert(`❌ Zoho Sync Error: ${error.message}`),
   });
 
   const handleApprove = () => {
@@ -126,7 +165,9 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
           <div className="w-full h-full p-4 overflow-auto flex justify-center"><NgrokImage src={invoice.image_url!} className="max-w-none w-auto h-auto object-contain" /></div>
         </div>
       )}
+      
       <div className="h-full w-full flex flex-col bg-slate-100 overflow-hidden">
+        {/* Top: Image Preview Section */}
         <div className={`w-full bg-slate-900 flex flex-col transition-all duration-300 ease-in-out border-b-4 border-brand-500 ${isImageCollapsed ? "h-12 shrink-0" : "h-[40vh] shrink-0"}`}>
           <div className="p-2 bg-slate-800 border-b border-slate-700 flex items-center justify-between text-white shrink-0">
             <div className="flex items-center gap-3">
@@ -149,9 +190,33 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
           {!isImageCollapsed && (<div className="flex-1 overflow-auto bg-slate-900/50 p-4 flex justify-center items-start"><NgrokImage src={invoice.image_url} className="shadow-2xl transition-transform duration-200 origin-top" style={{ transform: `scale(${scale})`, maxWidth: "100%" }}/></div>)}
         </div>
         
+        {/* Bottom: Review Form Section */}
         <div className="flex-1 bg-white flex flex-col min-h-0 overflow-hidden relative z-10">
           <div className="flex-1 overflow-y-auto p-4 lg:p-8 pb-24">
-            <div className="max-w-5xl mx-auto space-y-6">
+            <div className="max-w-5xl mx-auto space-y-4">
+              
+              {/* COMPACT COMPLIANCE STATUS BAR */}
+              <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-2">
+                <div className="flex items-center gap-4">
+                  <div>
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Legal Verification</h3>
+                    <p className={`text-sm font-bold ${invoice.compliance_data?.isCompliant ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {invoice.compliance_data?.isCompliant ? 'Fully Compliant' : 'Non-Compliant Doc'}
+                    </p>
+                  </div>
+                  <div className="h-8 w-px bg-slate-100 mx-2" />
+                  <ComplianceChecklist data={invoice.compliance_data} />
+                </div>
+
+                {!invoice.compliance_data?.isCompliant && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-rose-600 text-white rounded-lg animate-pulse shadow-lg shadow-rose-200">
+                    <ShieldAlert size={14} />
+                    <span className="text-[10px] font-black uppercase">Tax Audit Risk</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Form Header Info */}
               <div className="grid grid-cols-1 md:grid-cols-12 gap-6 bg-slate-50 p-6 rounded-xl border border-slate-200">
                 <div className="md:col-span-4">
                   <label className="zoho-label flex items-center justify-between">{isSalesInvoice ? "Customer Name" : "Vendor Name"} <span className="text-[9px] font-bold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded flex items-center gap-1"><UserCheck size={10}/> AI MATCH</span></label>
@@ -164,6 +229,7 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
                 <div className="md:col-span-3"><label className="zoho-label">Due Date</label><input type="date" value={header.dueDate} onChange={(e) => setHeader({ ...header, dueDate: e.target.value })} className="zoho-input" /></div>
               </div>
 
+              {/* Table Area */}
               <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200">
@@ -180,7 +246,23 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
                     {lines.map((line, i) => (
                       <tr key={i} className="group hover:bg-slate-50/80 transition-colors">
                         <td className="p-2"><input type="text" value={line.description} onChange={(e) => updateLine(i, "description", e.target.value)} className="w-full bg-transparent p-2 outline-none font-medium text-slate-700 placeholder:text-slate-300" placeholder="Description..."/></td>
-                        <td className="p-2"><div className="relative"><select value={line.accountId} onChange={(e) => updateLine(i, "accountId", e.target.value)} className={`w-full p-2 rounded-lg border text-xs font-semibold outline-none appearance-none cursor-pointer transition-all ${line.accountId ? "bg-white border-slate-200 text-slate-900" : "bg-red-50 border-red-200 text-red-600"}`}><option value="">-- Select Account --</option>{accounts?.map((a) => (<option key={a.account_id} value={a.account_id}>{a.account_name} ({a.account_code})</option>))}</select>{line.accountId && (<div className="absolute right-8 top-1/2 -translate-y-1/2 text-[9px] font-bold text-brand-600 bg-brand-50 px-1 rounded">AI MATCH</div>)}</div></td>
+                        <td className="p-2">
+                          <div className="relative">
+                            <select 
+                              value={line.accountId} 
+                              onChange={(e) => updateLine(i, "accountId", e.target.value)} 
+                              className={`w-full p-2 rounded-lg border text-xs font-semibold outline-none appearance-none cursor-pointer transition-all ${line.accountId ? "bg-white border-slate-200 text-slate-900" : "bg-red-50 border-red-200 text-red-600"}`}
+                            >
+                              <option value="">-- Select Account --</option>
+                              {accounts?.map((a) => (
+                                <option key={a.account_id} value={a.account_id}>{a.account_name} ({a.account_code})</option>
+                              ))}
+                            </select>
+                            {line.accountId && (
+                              <div className="absolute right-8 top-1/2 -translate-y-1/2 text-[9px] font-bold text-brand-600 bg-brand-50 px-1 rounded pointer-events-none">AI MATCH</div>
+                            )}
+                          </div>
+                        </td>
                         <td className="p-2"><input type="number" value={line.quantity} onChange={(e) => updateLine(i, "quantity", parseFloat(e.target.value))} className="w-full bg-transparent p-2 outline-none text-right font-mono text-slate-700"/></td>
                         <td className="p-2"><input type="number" value={line.rate} onChange={(e) => updateLine(i, "rate", parseFloat(e.target.value))} className="w-full bg-transparent p-2 outline-none text-right font-mono text-slate-700"/></td>
                         <td className="p-2">{!isSalesInvoice && <select value={line.customerId} onChange={(e) => updateLine(i, "customerId", e.target.value)} className="w-full bg-transparent p-2 outline-none text-slate-500 text-xs cursor-pointer"><option value="">-- None --</option>{customers?.map((c) => (<option key={c.contact_id} value={c.contact_id}>{c.contact_name}</option>))}</select>}</td>
@@ -192,6 +274,7 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
                 <div className="bg-slate-50 p-2 border-t border-slate-200"><button onClick={addLine} className="text-xs font-bold text-brand-600 hover:text-brand-800 flex items-center gap-1 px-2 py-1 rounded hover:bg-brand-50 transition-colors"><Plus size={14} /> Add Line Item</button></div>
               </div>
 
+              {/* Totals Area */}
               <div className="flex justify-end">
                 <div className="w-full md:w-1/3 bg-slate-50 p-6 rounded-xl border border-slate-200 space-y-3">
                   <div className="flex justify-between text-sm text-slate-600"><span>Sub Total</span><span className="font-mono">{subTotal.toFixed(2)}</span></div>
@@ -207,10 +290,11 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
             </div>
           </div>
 
+          {/* Action Footer */}
           <div className="p-4 bg-white border-t border-slate-200 flex justify-end gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] sticky bottom-0 z-20">
             <button onClick={() => navigate("/")} className="px-6 py-2.5 border border-slate-300 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
             <button onClick={handleApprove} disabled={approveMutation.isPending} className="premium-button-primary">
-              {approveMutation.isPending ? "Syncing..." : (isSalesInvoice ? "Approve & Send Invoice" : "Approve & Push Bill")}
+              {approveMutation.isPending ? "Syncing to Zoho..." : (isSalesInvoice ? "Approve & Send Invoice" : "Approve & Push Bill")}
             </button>
           </div>
         </div>

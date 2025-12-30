@@ -1,14 +1,41 @@
 import httpx
+import time
 from typing import List, Dict, Any
 from app.core.config import settings
 import os # Ensure os is imported if not already
 
+CACHED_ACCESS_TOKEN = None
+TOKEN_EXPIRY_TIME = 0
+
+
 # This function might not be directly in this file in your structure, but the logic is what's important
 async def get_access_token():
-    # This function should remain as it is, handling token refresh
-    # For brevity, I'm assuming your existing get_access_token() is correct.
-    # A placeholder is used here.
-    return os.getenv("ZOHO_ACCESS_TOKEN_PLACEHOLDER")
+    global CACHED_ACCESS_TOKEN, TOKEN_EXPIRY_TIME
+    current_time = time.time()
+    
+    if CACHED_ACCESS_TOKEN and current_time < (TOKEN_EXPIRY_TIME - 60):
+        return CACHED_ACCESS_TOKEN
+
+    # exchange refresh token for access token
+    url = "https://accounts.zoho.com/oauth/v2/token"
+    params = {
+        "refresh_token": settings.ZOHO_REFRESH_TOKEN,
+        "client_id": settings.ZOHO_CLIENT_ID,
+        "client_secret": settings.ZOHO_CLIENT_SECRET,
+        "grant_type": "refresh_token"
+    }
+    
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(url, params=params)
+        data = resp.json()
+        
+        if "access_token" in data:
+            CACHED_ACCESS_TOKEN = data["access_token"]
+            TOKEN_EXPIRY_TIME = current_time + data.get("expires_in", 3600)
+            return CACHED_ACCESS_TOKEN
+        else:
+            print(f"❌ Auth Error: {data}")
+            return None
 
 
 # 1. Generic Fetcher (Handles Pagination)
@@ -79,26 +106,26 @@ async def create_zoho_contact(name: str, trn: str = None, address: str = None) -
             raise Exception(f"Zoho Contact Creation Failed: {data.get('message')}")
 
 async def create_zoho_bill_or_invoice(payload: dict, category: str):
-    """
-    Creates a Bill (if expense) or an Invoice (if sales) in Zoho Books.
-    """
     token = await get_access_token()
-    
-    # Determine the correct endpoint based on the category
     endpoint = "bills" if category == "bill" else "invoices"
     
-    url = f"https://www.zohoapis.com/books/v3/{endpoint}?organization_id={settings.ZOHO_ORG_ID}"
-    headers = {"Authorization": f"Zoho-oauthtoken {token}"}
+    # URL must include organization_id
+    url = f"https://www.zohoapis.com/books/v3/{endpoint}"
+    params = {"organization_id": settings.ZOHO_ORG_ID} # <-- Ensure this is sent
+    
+    headers = {
+        "Authorization": f"Zoho-oauthtoken {token}",
+        "Content-Type": "application/json"
+    }
     
     async with httpx.AsyncClient() as client:
-        resp = await client.post(url, json=payload, headers=headers)
+        resp = await client.post(url, json=payload, headers=headers, params=params)
         data = resp.json()
-        
         if data.get("code") == 0:
             return data.get("bill") or data.get("invoice")
         else:
-            print("❌ Zoho Payload Sent:", payload)
             raise Exception(f"Zoho {category} Creation Failed: {data.get('message')}")
+
 
 
 async def upload_attachment_to_bill(bill_id: str, file_path: str):

@@ -24,7 +24,7 @@ class MockDataFactory:
         await asyncio.sleep(0.5) 
         return [
             # ADDED SALES ACCOUNT FOR THE DEMO
-            {"account_id": "123123", "account_name": "Some Custom Account", "account_code": "CUSTOM-01", "type": "expense"},
+            {"account_id": "8057952000000107003", "account_name": "Some Custom Account", "account_code": "123123", "type": "expense"},
             {"account_id": "40001", "account_name": "Sales", "account_code": "4000", "type": "income"},
             {"account_id": "99001", "account_name": "Advertising & Marketing", "account_code": "6001", "type": "expense"},
             {"account_id": "99002", "account_name": "Meals & Entertainment", "account_code": "6005", "type": "expense"},
@@ -40,7 +40,7 @@ class MockDataFactory:
         return [
             {"contact_id": "88001", "contact_name": "Acme Corp (Client)"},
             {"contact_id": "88002", "contact_name": "Globex Inc"},
-            {"contact_id": "88003", "contact_name": "XYZ Solutions FZC"},
+            {"contact_id": "8057952000000093284", "contact_name": "XYZ Solutions FZC"},
         ]
 
     async def process_upload(self, file_name: str, category: str):
@@ -52,7 +52,7 @@ class MockDataFactory:
         # 1. SMART GUESS LOGIC
         # We determine Vendor + Account ID based on filename
         if "uber" in file_name.lower():
-            vendor = "Uber Technologies"
+            vendor = "XYZ Solutions FZC"
             amount = 45.50
             acct_id = "99004" # Travel Expense
             desc = "Taxi Ride - Client Meeting"
@@ -133,8 +133,7 @@ class MockDataFactory:
                 return inv
         return None
 
-    async def approve_invoice(self, bill_number: str):
-        await asyncio.sleep(1.5)
+    def approve_invoice(self, bill_number: str):
         for inv in MOCK_INVOICE_DB:
             if inv["invoice_number"] == bill_number:
                 inv["status"] = "synced"

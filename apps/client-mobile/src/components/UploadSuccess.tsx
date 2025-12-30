@@ -42,29 +42,6 @@ export function UploadSuccess({ onDismiss, data }: Props) {
             <FileText size={80} />
           </div>
 
-          <div className="space-y-4 relative z-10">
-            <div>
-              <p className="text-xs text-slate-400 mb-1">Vendor</p>
-              <p className="text-lg font-bold text-slate-900">
-                Uber Technologies Inc
-              </p>
-            </div>
-
-            <div className="flex gap-8">
-              <div>
-                <p className="text-xs text-slate-400 mb-1 flex items-center gap-1">
-                  <Calendar size={10} /> Date
-                </p>
-                <p className="text-sm font-semibold text-slate-700">
-                  Oct 24, 2025
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 mb-1">Total Amount</p>
-                <p className="text-sm font-black text-slate-900">AED 45.50</p>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Action Button */}

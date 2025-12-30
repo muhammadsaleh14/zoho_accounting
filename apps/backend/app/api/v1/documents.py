@@ -162,7 +162,7 @@ async def upload_document(
         with open(original_filepath, "rb") as f:
             file_bytes = f.read()
 
-        extracted_data = await analyze_document(file_bytes, db, file.content_type)
+        extracted_data = await analyze_document(file_bytes, db, file.content_type, filename=file.filename)
         
         # Simulate vendor check
         if extracted_data.vendor:

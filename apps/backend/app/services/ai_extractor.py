@@ -67,7 +67,7 @@ def normalize_float(val):
     except:
         return 0.0
 
-async def analyze_document(file_bytes: bytes, db: Session, mime_type: str = "image/jpeg") -> ExtractedData:
+async def analyze_document(file_bytes: bytes, db: Session, mime_type: str = "image/jpeg", filename: str = "") -> ExtractedData:
     """
     --- DEMO MODE ---
     This function is currently in DEMO MODE. It does NOT call the real Gemini AI.
@@ -81,6 +81,16 @@ async def analyze_document(file_bytes: bytes, db: Session, mime_type: str = "ima
         # --- MOCK LOGIC ---
         # 1. We immediately get our perfect, hardcoded data.
         raw_data = get_mock_analysis_data()
+        
+        if "bad" in filename.lower():
+            print("❌ 'Bad' filename detected. Setting compliance to FALSE.")
+            raw_data["compliance"]["isCompliant"] = False
+            raw_data["compliance"]["details"]["taxInvoiceLabel"] = False # Missing label
+            raw_data["compliance"]["missingFields"] = ["Mandatory 'Tax Invoice' label missing from header"]
+        else:
+            # Default to success if not "bad"
+            raw_data["compliance"]["isCompliant"] = True
+            raw_data["compliance"]["details"]["taxInvoiceLabel"] = True
         
         # 2. The rest of the function proceeds as normal, using our mock data.
         # This part processes the "AI output" into the application's data structures.
@@ -96,7 +106,7 @@ async def analyze_document(file_bytes: bytes, db: Session, mime_type: str = "ima
         raw_lines = raw_data.get("lines", [])
         clean_lines = []
         for item in raw_lines:
-            matched_account_id = "123123" 
+            matched_account_id = "8057952000000107003" 
             qty = normalize_float(item.get("quantity", 1))
             rate = normalize_float(item.get("rate", 0))
             if qty == 0: qty = 1.0
