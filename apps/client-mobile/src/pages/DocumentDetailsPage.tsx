@@ -2,13 +2,10 @@ import {
   ArrowLeft,
   Calendar,
   FileText,
-  CheckCircle2,
-  AlertCircle,
-  Share,
-  Download,
-  Receipt,
   ShieldCheck,
   Hash,
+  AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
 import type { Invoice } from "@receipt-app/shared";
 
@@ -22,15 +19,17 @@ export function DocumentDetailsPage({ invoice, onBack }: Props) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "approved":
-        return "bg-green-100 text-green-700 border-green-200";
       case "synced":
-        return "bg-blue-100 text-blue-700 border-blue-200";
+        return "bg-green-100 text-green-700 border-green-200";
       case "rejected":
         return "bg-red-100 text-red-700 border-red-200";
       default:
         return "bg-amber-100 text-amber-700 border-amber-200";
     }
   };
+
+  const compliance = invoice.complianceData;
+  const isCompliant = compliance?.isCompliant;
 
   return (
     <div className="fixed inset-0 bg-surface-50 z-50 flex flex-col overflow-hidden animate-in slide-in-from-right duration-300">
@@ -43,9 +42,7 @@ export function DocumentDetailsPage({ invoice, onBack }: Props) {
           <ArrowLeft size={24} />
         </button>
         <span className="font-bold text-slate-900">Document Details</span>
-        <button className="p-2 text-brand-600">
-          <Share size={20} />
-        </button>
+        <div className="w-8" /> {/* Spacer */}
       </div>
 
       {/* 2. Scrollable Content */}
@@ -67,9 +64,9 @@ export function DocumentDetailsPage({ invoice, onBack }: Props) {
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-60"></div>
           <div className="absolute bottom-4 left-4 text-white">
-            <p className="text-xs opacity-80">Uploaded on</p>
-            <p className="text-sm font-medium">
-              {invoice.created_at || invoice.date}
+            <p className="text-xs opacity-80">Category</p>
+            <p className="text-sm font-medium capitalize">
+              {invoice.category.replace("_", " ")}
             </p>
           </div>
         </div>
@@ -84,9 +81,9 @@ export function DocumentDetailsPage({ invoice, onBack }: Props) {
                 </h1>
                 <div className="flex items-center gap-2">
                   <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wide ${getStatusColor(invoice.status || "review")}`}
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wide ${getStatusColor(invoice.status)}`}
                   >
-                    {invoice.status || "Review"}
+                    {invoice.status}
                   </span>
                   <span className="text-xs text-slate-400">#{invoice.id}</span>
                 </div>
@@ -104,7 +101,7 @@ export function DocumentDetailsPage({ invoice, onBack }: Props) {
             <div className="grid grid-cols-2 gap-4 py-4 border-t border-slate-100">
               <div>
                 <p className="text-xs text-slate-400 mb-1 flex items-center gap-1">
-                  <Calendar size={12} /> Invoice Date
+                  <Calendar size={12} /> Date
                 </p>
                 <p className="text-sm font-semibold text-slate-700">
                   {invoice.date}
@@ -112,35 +109,49 @@ export function DocumentDetailsPage({ invoice, onBack }: Props) {
               </div>
               <div>
                 <p className="text-xs text-slate-400 mb-1 flex items-center gap-1">
-                  <Hash size={12} /> Invoice #
+                  <Hash size={12} /> Doc #
                 </p>
                 <p className="text-sm font-semibold text-slate-700">
-                  {invoice.invoiceNumber || "N/A"}
+                  {invoice.invoiceNumber || "---"}
                 </p>
               </div>
             </div>
 
             {/* Compliance Banner */}
-            <div className="mt-2 bg-slate-50 rounded-xl p-3 flex items-start gap-3 border border-slate-100">
-              <ShieldCheck
-                className="text-emerald-500 shrink-0 mt-0.5"
-                size={18}
-              />
-              <div>
-                <p className="text-xs font-bold text-slate-700">
-                  Compliance Verified
-                </p>
-                <p className="text-[10px] text-slate-500 leading-relaxed">
-                  AI detected Tax Invoice label, Date, and Total Amount. TRN
-                  format appears valid.
-                </p>
+            {compliance && (
+              <div
+                className={`mt-2 rounded-xl p-3 flex items-start gap-3 border ${isCompliant ? "bg-emerald-50 border-emerald-100" : "bg-red-50 border-red-100"}`}
+              >
+                {isCompliant ? (
+                  <ShieldCheck
+                    className="text-emerald-500 shrink-0 mt-0.5"
+                    size={18}
+                  />
+                ) : (
+                  <AlertTriangle
+                    className="text-red-500 shrink-0 mt-0.5"
+                    size={18}
+                  />
+                )}
+                <div>
+                  <p
+                    className={`text-xs font-bold ${isCompliant ? "text-emerald-700" : "text-red-700"}`}
+                  >
+                    {isCompliant ? "VAT Compliant" : "Compliance Issues"}
+                  </p>
+                  <p className="text-[10px] text-slate-500 leading-relaxed mt-0.5">
+                    {isCompliant
+                      ? "Passed all AI checks for Tax Invoice validity."
+                      : `Missing: ${compliance.missingFields.join(", ")}`}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Line Items */}
           <h3 className="text-sm font-bold text-slate-900 mb-3 px-1">
-            Line Items
+            Line Items ({invoice.lineItems?.length || 0})
           </h3>
           <div className="bg-white rounded-2xl shadow-sm border border-surface-200 overflow-hidden mb-6">
             {!invoice.lineItems || invoice.lineItems.length === 0 ? (
@@ -156,17 +167,21 @@ export function DocumentDetailsPage({ invoice, onBack }: Props) {
                   >
                     <div className="flex items-start gap-3">
                       <div className="bg-slate-100 text-slate-500 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
-                        {Math.round(item.quantity)}x
+                        {item.quantity}
                       </div>
                       <div>
                         <p className="text-sm font-bold text-slate-800 line-clamp-2">
                           {item.description}
                         </p>
-                        {item.accountId && (
+                        {item.accountId ? (
                           <p className="text-[10px] text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded inline-block mt-1">
                             {item.accountId}
                           </p>
-                        )}
+                        ) : item.account_guess ? (
+                          <p className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded inline-block mt-1">
+                            AI Guess: {item.account_guess}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                     <p className="text-sm font-bold text-slate-900">
@@ -180,13 +195,7 @@ export function DocumentDetailsPage({ invoice, onBack }: Props) {
             {/* Totals Footer */}
             <div className="bg-slate-50 p-4 border-t border-slate-100 space-y-2">
               <div className="flex justify-between text-xs text-slate-500">
-                <span>Subtotal</span>
-                <span>
-                  {invoice.currency} {invoice.amount?.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs text-slate-500">
-                <span>Tax</span>
+                <span>Tax (VAT)</span>
                 <span>
                   {invoice.currency} {invoice.taxAmount?.toFixed(2) || "0.00"}
                 </span>
@@ -200,16 +209,6 @@ export function DocumentDetailsPage({ invoice, onBack }: Props) {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* 3. Bottom Actions */}
-      <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-surface-200 p-4 pb-8 flex gap-3 shadow-float z-20">
-        <button className="flex-1 py-3.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50">
-          Reject
-        </button>
-        <button className="flex-1 py-3.5 rounded-xl bg-brand-600 text-white font-bold text-sm shadow-lg shadow-brand-200 hover:bg-brand-700">
-          Approve
-        </button>
       </div>
     </div>
   );

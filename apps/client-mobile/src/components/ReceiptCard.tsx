@@ -3,7 +3,7 @@ import { Calendar, FileText, MoreHorizontal } from "lucide-react";
 
 interface Props {
   invoice: Invoice;
-  onClick?: (invoice: Invoice) => void; // Added Prop
+  onClick?: (invoice: Invoice) => void;
 }
 
 export function ReceiptCard({ invoice, onClick }: Props) {
@@ -13,19 +13,24 @@ export function ReceiptCard({ invoice, onClick }: Props) {
       ? 100
       : invoice.status === "review"
         ? 60
-        : 30;
+        : invoice.status === "rejected"
+          ? 100
+          : 30; // queue or other
 
   const statusColor =
-    invoice.status === "approved" ? "bg-green-500" : "bg-amber-500";
+    invoice.status === "approved" || invoice.status === "synced"
+      ? "bg-green-500"
+      : invoice.status === "rejected"
+        ? "bg-red-500"
+        : "bg-amber-500";
 
   const displayId =
     String(invoice.id || "")
-      .slice(-6)
+      .slice(-4)
       .toUpperCase() || "---";
 
   return (
     <div
-      // Added click handler here
       onClick={() => onClick && onClick(invoice)}
       className="bg-white dark:bg-slate-800 p-4 mx-6 mb-3 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex gap-4 active:scale-[0.98] transition-all cursor-pointer"
     >
@@ -75,7 +80,6 @@ export function ReceiptCard({ invoice, onClick }: Props) {
                 style={{ width: `${progress}%` }}
               />
             </div>
-            {/* Prevent bubbling if they click the menu specifically */}
             <button
               className="text-slate-300"
               onClick={(e) => {

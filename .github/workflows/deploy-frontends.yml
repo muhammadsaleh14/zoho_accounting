@@ -44,8 +44,9 @@ jobs:
 
       # --- Build and Deploy Web Plugin ---
       - name: Replace API URL for Web Plugin
-        run: sed -i "s|http://localhost:8000|${{ env.NGROK_URL }}|g" apps/web-plugin/src/config.ts
-
+        run: |
+          sed -i "s|http://localhost:8000|${{ env.NGROK_URL }}|g" apps/web-plugin/src/config.ts
+          sed -i "s|http://localhost:8000|${{ env.NGROK_URL }}|g" apps/web-plugin/src/services/api.ts
       - name: Build web-plugin application
         # ✅ CORRECTED: Uses the actual package name "web-plugin"
         run: yarn workspace web-plugin build

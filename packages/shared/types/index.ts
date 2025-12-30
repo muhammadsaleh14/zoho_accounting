@@ -1,5 +1,10 @@
 // 1. Shared Enums
-export type ReceiptStatus = "review" | "approved" | "rejected" | "synced";
+export type ReceiptStatus =
+  | "review"
+  | "approved"
+  | "rejected"
+  | "synced"
+  | "queue"; // Added queue
 export type DocumentCategory = "bill" | "invoice" | "bank_statement";
 
 // 2. Sub-Objects
@@ -8,15 +13,19 @@ export interface VendorDraft {
   trn?: string;
   address?: string;
   is_new: boolean;
-  existing_id?: number | null; // ID from Local Postgres
+  existing_id?: number | null;
+  zoho_contact_id?: string | null; // Added
 }
 
 export interface LineItem {
+  id?: number; // Added optional ID
   description: string;
   quantity: number;
   rate: number;
-  accountId?: string | null; // Prediction from Backend
-  customerId?: string | null; // For Billable Expenses
+  accountId?: string | null;
+  zoho_account_id?: string | null; // Added alias for backend compatibility
+  customerId?: string | null;
+  account_guess?: string | null; // Added for AI hints
 }
 
 export interface ComplianceChecklist {
@@ -25,44 +34,52 @@ export interface ComplianceChecklist {
   details: Record<string, boolean>;
 }
 
-// 3. The Main Data Object (Matches Pydantic 'ExtractedData')
+// 3. Main Data Object
 export interface Invoice {
-  id?: string; // Keep this optional for local state
+  id: string; // Changed to required string for UI keys
   category: DocumentCategory;
-  confidenceScore: number;
-  warningMessage?: string | null;
 
-  vendor?: VendorDraft;
-
-  // --- MODIFIED: Ensure all keys are camelCase ---
-  vendorId?: number | null;
+  // Vendor
+  vendor: string; // Mobile UI expects a string name here
+  vendor_id?: number | null;
   vendorNameRaw?: string;
-  date?: string;
+
+  // Dates
+  date: string;
   dueDate?: string;
+  created_at?: string;
+
+  // Header Details
   invoiceNumber?: string;
+  invoice_number?: string; // Alias
   referenceNumber?: string;
-  taxAmount: number;
-  totalAmount: number; // Use totalAmount to match AI extractor
-  discount: number;
+  reference_number?: string; // Alias
+  notes?: string;
+
+  // Financials
+  amount: number;
+  taxAmount?: number;
+  tax_amount?: number; // Alias
+  discount?: number;
   adjustment?: number;
   currency: string;
-  status?: ReceiptStatus;
-  image_url?: string; // This is the critical change
-  complianceData?: ComplianceChecklist;
-  zohoBillId?: string | null;
-  createdAt?: string; // Date strings from JSON
-  // --- END OF MODIFICATION ---
-  
-  lineItems: LineItem[];
 
-  // Deprecated fields from old structure, can be removed if not used
-  amount?: number; 
-  
+  // Status & Media
+  status: ReceiptStatus;
+  image_url: string;
+
+  // Complex Data
+  lineItems: LineItem[];
+  line_items?: LineItem[]; // Alias from backend
+  complianceData?: ComplianceChecklist; // Mobile UI Key
+  compliance_data?: ComplianceChecklist; // Backend Key
+  zohoBillId?: string | null;
+  zoho_bill_id?: string | null; // Backend Key
 }
 
 // 4. Account (For Dropdowns)
 export interface LedgerAccount {
-  account_id: string; // The Zoho ID
+  account_id: string;
   account_name: string;
   account_code: string;
   type: string;

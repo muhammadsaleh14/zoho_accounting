@@ -1,12 +1,9 @@
-// --- File: apps/client-mobile/src/services/api.ts ---
-
 import axios from "axios";
 import type { DocumentCategory, Invoice } from "@receipt-app/shared";
 
 // --- CONFIGURATION ---
-// 1. SERVER_ROOT: Used to construct absolute image URLs (e.g., http://localhost:8000/images/...)
-// Note: If testing on Android Emulator, use "http://10.0.2.2:8000"
-// Note: If testing on Physical Device, use your PC's LAN IP "http://192.168.1.X:8000"
+// Android Emulator: http://10.0.2.2:8000
+// Physical Device: http://YOUR_PC_IP:8000
 export const SERVER_ROOT = "http://localhost:8000";
 export const API_BASE = `${SERVER_ROOT}/api/v1`;
 
@@ -18,26 +15,60 @@ const axiosConfig = {
 
 // --- ADAPTER: Transform Backend Data to Frontend UI Format ---
 const transformInvoice = (data: any): Invoice => {
-  return {
-    ...data,
-    // 1. Fix Vendor Name: Backend sends 'vendor_name_raw', UI expects 'vendor'
-    vendor: data.vendor_name_raw || data.vendor?.name || "Unknown Vendor",
+  // Normalize Line Items
+  const rawLines = data.line_items || data.lineItems || [];
+  const normalizedLines = rawLines.map((line: any) => ({
+    id: line.id,
+    description: line.description,
+    quantity: line.quantity,
+    rate: line.rate,
+    accountId: line.zoho_account_id || line.accountId || null,
+    account_guess: line.account_guess || null,
+  }));
 
-    // 2. Fix Image URL: Backend sends relative '/images/x.jpg', UI needs absolute 'http://...'
+  // Normalize Compliance
+  const compliance = data.compliance_data || data.complianceData || null;
+
+  return {
+    id: String(data.id),
+    category: data.category || "bill",
+
+    // Vendor Logic: Priority -> data.vendor (string) -> data.vendor_name_raw -> "Unknown"
+    vendor:
+      data.vendor_name_raw ||
+      data.vendorNameRaw ||
+      (typeof data.vendor === "string" ? data.vendor : data.vendor?.name) ||
+      "Unknown Vendor",
+    vendor_id: data.vendor_id,
+
+    // Dates
+    date: data.date || new Date().toISOString().split("T")[0],
+    created_at: data.created_at,
+    dueDate: data.due_date || data.dueDate,
+
+    // Numbers
+    amount: data.amount || 0,
+    taxAmount: data.tax_amount || data.taxAmount || 0,
+    currency: data.currency || "AED",
+    discount: data.discount || 0,
+
+    // Meta
+    invoiceNumber: data.invoice_number || data.invoiceNumber,
+    referenceNumber: data.reference_number || data.referenceNumber,
+    notes: data.notes || data.subject,
+    status: data.status || "review",
+
+    // Image
     image_url: data.image_url
       ? data.image_url.startsWith("http")
         ? data.image_url
         : `${SERVER_ROOT}${data.image_url}`
       : "",
 
-    // 3. Fix Line Items: Ensure they exist and map keys if necessary
-    lineItems: data.line_items || data.lineItems || [],
-
-    // 4. Ensure Status is valid
-    status: data.status || "review",
-
-    // 5. Ensure Date string exists
-    date: data.date || new Date().toISOString().split("T")[0],
+    // Complex Objects
+    lineItems: normalizedLines,
+    complianceData: compliance,
+    zohoBillId: data.zoho_bill_id,
   };
 };
 
@@ -48,15 +79,23 @@ export const api = {
         `${API_BASE}/documents/invoices`,
         axiosConfig
       );
-      // Run every item through the adapter
       return response.data.map(transformInvoice);
     } catch (error) {
-      console.error(
-        "API Error: Could not connect to the backend.",
-        error
-      );
-      // FIXED: Return an empty array on error instead of faulty mock data.
+      console.error("API Error (getInvoices):", error);
       return [];
+    }
+  },
+
+  getInvoiceById: async (id: string): Promise<Invoice | null> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE}/documents/invoices/${id}`,
+        axiosConfig
+      );
+      return transformInvoice(response.data);
+    } catch (error) {
+      console.error(`API Error (getInvoiceById ${id}):`, error);
+      return null;
     }
   },
 
@@ -82,12 +121,10 @@ export const api = {
         uploadConfig
       );
 
-      // Transform the single result
       return transformInvoice(response.data);
     } catch (error) {
-        console.error("Upload failed:", error);
-        // FIXED: Throw an error to let the UI handle it, rather than returning bad mock data.
-        throw new Error("File upload failed. Please ensure the backend server is running.");
+      console.error("Upload failed:", error);
+      throw new Error("File upload failed.");
     }
   },
 
@@ -99,33 +136,22 @@ export const api = {
       );
       return response.data;
     } catch (error) {
-      // Return dummy notifications on error
-      return [
-        {
-          id: "1",
-          title: "Receipt Approved",
-          description: "Your Uber receipt was approved.",
-          time: "2m ago",
-          type: "success",
-          read: false,
-        },
-        {
-          id: "2",
-          title: "Missing Information",
-          description: "Please add VAT number to the invoice.",
-          time: "1h ago",
-          type: "alert",
-          read: false,
-        },
-        {
-          id: "3",
-          title: "New Feature",
-          description: "Check out the new dark mode!",
-          time: "1d ago",
-          type: "info",
-          read: true,
-        },
-      ];
+      return [];
+    }
+  },
+
+  // Add Approval capability to Mobile
+  approveInvoice: async (data: any) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE}/accounting/approve`,
+        data,
+        axiosConfig
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Approval failed:", error);
+      throw error;
     }
   },
 };

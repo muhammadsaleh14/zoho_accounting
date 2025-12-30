@@ -50,9 +50,15 @@ function MobileWallet() {
     mutationFn: (vars: { file: File; category: DocumentCategory }) =>
       api.uploadReceipt(vars.file, vars.category),
     onSuccess: (data) => {
+      // Invalidate to fetch list again from server
       client.invalidateQueries({ queryKey: ["invoices"] });
+
+      // Store result to show Success screen
       setLastUploadedData(data);
       setShowSuccess(true);
+    },
+    onError: (error) => {
+      alert("Upload Failed: " + error);
     },
   });
 
