@@ -1,6 +1,5 @@
 // File: apps/web-plugin/src/types/index.ts
 
-// 1. Vendor Structure
 export interface Vendor {
   name: string;
   trn?: string | null;
@@ -11,24 +10,23 @@ export interface Vendor {
   zoho_contact_id?: string | null;
 }
 
-// 2. Line Item (Supporting both camelCase and snake_case for safety)
 export interface LineItem {
   id?: number;
   description: string;
   quantity: number;
   rate: number;
-
-  // Backend might return either, so we type both
   accountId?: string | null;
   zoho_account_id?: string | null;
-
   customerId?: string | null;
+  // --- NEW ---
+  account_guess?: string | null;
 }
 
-// 3. Compliance Data
 export interface ComplianceDetails {
   taxInvoiceLabel?: boolean;
   vatAmountShown?: boolean;
+  supplierTRN?: boolean;
+  invoiceNumberPresent?: boolean;
   [key: string]: boolean | undefined;
 }
 
@@ -38,56 +36,43 @@ export interface ComplianceData {
   details: ComplianceDetails;
 }
 
-// 4. Main Invoice Object (The Data Contract)
 export interface Invoice {
-  id: string; // ID is usually string in frontend URL params
-
-  // Status & Meta
+  id: string;
   status: "review" | "approved" | "rejected" | "synced" | "queue";
   category: "bill" | "invoice" | "bank_statement";
   image_url: string;
   created_at?: string;
 
-  // Vendor Info (Handle mapping variations)
-  vendor?: Vendor; // Vendor Object
+  vendor?: Vendor;
   vendor_id?: number | null;
-  vendor_name_raw?: string; // Raw string from OCR
-  vendorNameRaw?: string; // CamelCase alternative
+  vendor_name_raw?: string;
+  vendorNameRaw?: string;
 
-  // Dates
-  date: string; // YYYY-MM-DD
-  due_date?: string; // snake_case from DB
-  dueDate?: string; // camelCase alternative
+  date: string;
+  due_date?: string;
+  dueDate?: string;
 
-  // Header Fields
   invoice_number?: string;
   invoiceNumber?: string;
-
-  reference_number?: string; // Order Number
+  reference_number?: string;
   referenceNumber?: string;
 
-  // Financials
+  // Added Notes
+  notes?: string;
+
   amount: number;
   total_amount?: number;
   tax_amount: number;
   currency: string;
-
   discount?: number;
   adjustment?: number;
 
-  // Details
-  line_items?: LineItem[]; // Backend usually sends snake_case
-  lineItems?: LineItem[]; // Frontend components might expect camelCase
-
-  // Compliance
+  line_items?: LineItem[];
+  lineItems?: LineItem[];
   compliance_data?: ComplianceData;
-  compliance?: { checklist: ComplianceData }; // Legacy structure support
-
-  // Bank Specific
   bankStatementData?: any;
 }
 
-// 5. Chart of Accounts (Dropdown)
 export interface Account {
   account_id: string;
   account_name: string;
@@ -95,7 +80,6 @@ export interface Account {
   type: string;
 }
 
-// 6. Customer (Dropdown)
 export interface Customer {
   contact_id: string;
   contact_name: string;

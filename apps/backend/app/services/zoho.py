@@ -153,11 +153,10 @@ async def fetch_chart_of_accounts() -> List[Dict[str, Any]]:
     base_url = "https://www.zohoapis.com/books/v3/chartofaccounts"
     headers = {"Authorization": f"Zoho-oauthtoken {token}"}
     
-    # Fetching more types to accommodate Sales accounts
-    target_types = ["Income", "Expense", "Other Expense", "Cost of Goods Sold", "Fixed Asset"]
     all_accounts = []
     
     async with httpx.AsyncClient() as client:
+        # REMOVED "filter_by=AccountType.Expense" to get Income accounts too
         params = {"organization_id": settings.ZOHO_ORG_ID, "per_page": 200, "filter_by": "Status.Active"}
         page = 1
         has_more = True
@@ -172,7 +171,16 @@ async def fetch_chart_of_accounts() -> List[Dict[str, Any]]:
                     break
                 
                 accounts = data.get("chartofaccounts", [])
+                
+                # We specifically allow Income types now
+                target_types = [
+                    "Income", "Other Income", 
+                    "Expense", "Other Expense", 
+                    "Cost of Goods Sold", "Fixed Asset"
+                ]
+                
                 for acc in accounts:
+                    # Zoho returns 'account_type_formatted' like "Cost of Goods Sold"
                     if acc.get("account_type_formatted") in target_types:
                         all_accounts.append(acc)
                 
@@ -183,5 +191,46 @@ async def fetch_chart_of_accounts() -> List[Dict[str, Any]]:
                 print(f"❌ Network Error fetching CoA: {e}")
                 break
     
-    print(f"✅ Fetched {len(all_accounts)} relevant accounts from Zoho.")
+    print(f"✅ Fetched {len(all_accounts)} accounts (Income + Expense) from Zoho.")
+    return all_accounts
+    token = await get_access_token()
+    if not token: return []
+
+    base_url = "https://www.zohoapis.com/books/v3/chartofaccounts"
+    headers = {"Authorization": f"Zoho-oauthtoken {token}"}
+    
+    # --- UPDATED: Fetch Income Accounts too ---
+    # We remove the "filter_by=AccountType.Expense" if it existed, or ensure we get all relevant types.
+    # The safest way is to fetch active accounts and filter in python or fetch everything.
+    
+    all_accounts = []
+    
+    async with httpx.AsyncClient() as client:
+        params = {"organization_id": settings.ZOHO_ORG_ID, "per_page": 200, "filter_by": "Status.Active"}
+        page = 1
+        has_more = True
+        
+        while has_more:
+            params["page"] = page
+            try:
+                resp = await client.get(base_url, headers=headers, params=params)
+                data = resp.json()
+                if data.get("code") != 0:
+                    break
+                
+                accounts = data.get("chartofaccounts", [])
+                
+                # Filter useful types
+                target_types = ["Income", "Other Income", "Expense", "Other Expense", "Cost of Goods Sold", "Fixed Asset"]
+                for acc in accounts:
+                     # Check account_type_formatted or account_type
+                    if acc.get("account_type_formatted") in target_types:
+                        all_accounts.append(acc)
+                
+                page_context = data.get("page_context", {})
+                has_more = page_context.get("has_more_page", False)
+                page += 1
+            except Exception:
+                break
+    
     return all_accounts

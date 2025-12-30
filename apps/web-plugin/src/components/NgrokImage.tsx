@@ -1,17 +1,18 @@
 // File: apps/web-plugin/src/components/NgrokImage.tsx
 
-import type { ImgHTMLAttributes } from 'react';
+import type { ImgHTMLAttributes } from "react";
 import { API_BASE_URL } from "@/services/api";
 
 export function NgrokImage(props: ImgHTMLAttributes<HTMLImageElement>) {
-  
   // 1. Log the props to see what we are receiving
   console.log("NgrokImage props:", props);
 
   if (!props.src) {
     console.error("NgrokImage Error: 'src' prop is missing or undefined.");
     return (
-      <div className={`flex items-center justify-center bg-slate-800 text-yellow-400 p-4 ${props.className}`}>
+      <div
+        className={`flex items-center justify-center bg-slate-800 text-yellow-400 p-4 ${props.className}`}
+      >
         <span>'src' prop is missing. Check console.</span>
       </div>
     );
@@ -21,7 +22,7 @@ export function NgrokImage(props: ImgHTMLAttributes<HTMLImageElement>) {
   const fullSrc = `${serverRoot}${props.src}`;
 
   // 2. Log the final URL we are trying to load
-  console.log("Attempting to load image from:", fullSrc);
+  // console.log("Attempting to load image from:", fullSrc);
 
   return (
     <img

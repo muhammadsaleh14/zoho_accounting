@@ -1,3 +1,5 @@
+# --- File: apps/backend/app/crud/crud_invoice.py ---
+
 from sqlalchemy.orm import Session
 from typing import List, Any, Dict
 from app.models.accounting import Invoice, LineItem
@@ -13,10 +15,6 @@ def create_invoice_with_lines(
     invoice_data: Dict[str, Any], 
     line_items_data: List[Dict[str, Any]]
 ):
-    """
-    Transactional creation: Saves Invoice AND Line Items.
-    If Line Items fail, the Invoice is rolled back.
-    """
     # 1. Create the Invoice Header
     db_invoice = Invoice(**invoice_data)
     db.add(db_invoice)
@@ -32,17 +30,18 @@ def create_invoice_with_lines(
                 description=item.get("description", "Unknown Item"),
                 quantity=item.get("quantity", 1.0),
                 rate=item.get("rate", 0.0),
-                zoho_account_id=item.get("accountId") # Mapped from AI prediction
+                zoho_account_id=item.get("accountId"),
+                # --- NEW: Save the raw AI guess ---
+                account_guess=item.get("account_guess") 
             )
             lines.append(line)
         
         db.add_all(lines)
         db.commit()
-        db.refresh(db_invoice) # Refresh to load relationships
+        db.refresh(db_invoice)
         return db_invoice
         
     except Exception as e:
         db.rollback()
-        # Optionally delete the header if lines failed, or keep it as 'error' state
         print(f"Error creating line items: {e}")
         return db_invoice

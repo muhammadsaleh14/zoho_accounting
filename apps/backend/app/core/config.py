@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     
     # Toggle this to False when you want to use Real DB / Zoho / Gemini
-    DEMO_MODE: bool = True 
+    DEMO_MODE: bool = False 
 
     # Existing Keys
     GOOGLE_API_KEY: str | None = None
