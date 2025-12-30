@@ -1,46 +1,101 @@
-// File: apps/web-plugin/src/components/NgrokImage.tsx
-
-import type { ImgHTMLAttributes } from "react";
+import { useState, useEffect, type ImgHTMLAttributes } from "react";
 import { API_BASE_URL } from "@/services/api";
 
 export function NgrokImage(props: ImgHTMLAttributes<HTMLImageElement>) {
-  // 1. Log the props to see what we are receiving
-  console.log("NgrokImage props:", props);
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  if (!props.src) {
-    console.error("NgrokImage Error: 'src' prop is missing or undefined.");
+  // Only run this effect when the src prop changes
+  useEffect(() => {
+    if (!props.src) {
+      setLoading(false);
+      setError(true);
+      return;
+    }
+
+    // We need a flag to prevent state updates if the component unmounts
+    // while the fetch is in progress.
+    let isCancelled = false;
+
+    const serverRoot = API_BASE_URL.replace("/api/v1", "");
+    const fullSrc = `${serverRoot}${props.src}`;
+
+    const fetchImage = async () => {
+      setLoading(true);
+      setError(false);
+
+      try {
+        // 1. FETCH the image using JS, which allows custom headers
+        const response = await fetch(fullSrc, {
+          headers: {
+            "ngrok-skip-browser-warning": "true",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch image: ${response.statusText}`);
+        }
+
+        // 2. Convert the response data to a blob
+        const imageBlob = await response.blob();
+
+        if (!isCancelled) {
+          // 3. Create a temporary local URL for the blob
+          const localUrl = URL.createObjectURL(imageBlob);
+          setObjectUrl(localUrl);
+        }
+      } catch (err) {
+        console.error("NgrokImage fetch error:", err);
+        if (!isCancelled) {
+          setError(true);
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchImage();
+
+    // 4. CLEANUP: When the component unmounts or src changes,
+    // revoke the old object URL to prevent memory leaks.
+    return () => {
+      isCancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+    // We add objectUrl to the dependency array to trigger cleanup correctly.
+  }, [props.src]);
+
+  if (loading) {
     return (
       <div
-        className={`flex items-center justify-center bg-slate-800 text-yellow-400 p-4 ${props.className}`}
+        className={`flex items-center justify-center bg-slate-800 text-slate-400 ${props.className}`}
       >
-        <span>'src' prop is missing. Check console.</span>
+        Loading...
       </div>
     );
   }
 
-  const serverRoot = API_BASE_URL.replace("/api/v1", "");
-  const fullSrc = `${serverRoot}${props.src}`;
+  if (error || !objectUrl) {
+    return (
+      <div
+        className={`flex items-center justify-center bg-slate-800 text-red-400 ${props.className}`}
+      >
+        Preview Failed
+      </div>
+    );
+  }
 
-  // 2. Log the final URL we are trying to load
-  // console.log("Attempting to load image from:", fullSrc);
-
+  // 5. RENDER the img tag with the temporary blob URL
   return (
     <img
       {...props}
-      src={fullSrc}
+      src={objectUrl} // Use the local blob URL, not the original ngrok URL
       alt={props.alt || "Document Preview"}
-      // 3. Add a detailed error logger
-      onError={(e) => {
-        console.error(`Failed to load image from: ${fullSrc}`);
-        console.error("Image load error event:", e);
-        (e.target as HTMLImageElement).outerHTML = `
-          <div class="flex flex-col items-center justify-center bg-slate-800 text-red-400 p-4 ${props.className}">
-            <span class="font-bold">Image Failed to Load</span>
-            <span class="text-xs mt-2">Check browser console for errors (F12).</span>
-            <span class="text-xs mt-1">URL: ${fullSrc}</span>
-          </div>
-        `;
-      }}
     />
   );
 }

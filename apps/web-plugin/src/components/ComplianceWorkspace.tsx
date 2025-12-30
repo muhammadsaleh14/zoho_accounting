@@ -521,23 +521,14 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
                         </td>
                         <td className="p-2">
                           <div
-                            className={`w-full p-2 rounded-lg border text-xs font-semibold 
-      ${
-        line.account_guess
-          ? "bg-slate-50 border-slate-200 text-slate-900"
-          : "bg-red-50 border-red-200 text-red-600"
-      }`}
+                            className={`w-full p-2 rounded-lg border text-xs font-semibold
+                              ${
+                                line.account_guess
+                                  ? "bg-slate-50 border-slate-200 text-slate-900"
+                                  : "bg-red-50 border-red-200 text-red-600"
+                              }`}
                           >
-                            {line.accountId
-                              ? filteredAccounts?.find(
-                                  (a) => a.account_id === line.accountId
-                                )
-                                ? `${filteredAccounts.find((a) => a.account_id === line.accountId).account_name}
-             (${filteredAccounts.find((a) => a.account_id === line.accountId).account_code})`
-                                : "Account linked"
-                              : line.account_guess
-                                ? `AI: ${line.account_guess}`
-                                : "No account"}
+                            {line.account_guess || "No account"}
                           </div>
                         </td>
                         <td className="p-2">
