@@ -26,8 +26,6 @@ import { NgrokImage } from "./NgrokImage";
 import { BankStatementView } from "./BankStatementView";
 import { useNavigate } from "react-router-dom";
 
-
-
 interface Props {
   invoice: Invoice;
   onSuccess: () => void;
@@ -522,30 +520,24 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
                           />
                         </td>
                         <td className="p-2">
-                          <div className="relative">
-                            <select
-                              value={line.accountId || ""}
-                              onChange={(e) =>
-                                updateLine(i, "accountId", e.target.value)
-                              }
-                              className={`w-full p-2 rounded-lg border text-xs font-semibold outline-none appearance-none cursor-pointer transition-all ${line.accountId ? "bg-white border-slate-200 text-slate-900" : "bg-red-50 border-red-200 text-red-600"}`}
-                            >
-                              <option value="">-- Select --</option>
-                              {filteredAccounts?.map((a) => (
-                                <option key={a.account_id} value={a.account_id}>
-                                  {a.account_name} ({a.account_code})
-                                </option>
-                              ))}
-                            </select>
-                            {line.accountId ? (
-                              <div className="absolute right-8 top-1/2 -translate-y-1/2 text-[9px] font-bold text-brand-600 bg-brand-50 px-1 rounded pointer-events-none">
-                                MATCHED
-                              </div>
-                            ) : line.account_guess ? (
-                              <div className="absolute right-8 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-500 bg-slate-100 px-1 rounded pointer-events-none">
-                                AI: {line.account_guess}
-                              </div>
-                            ) : null}
+                          <div
+                            className={`w-full p-2 rounded-lg border text-xs font-semibold 
+      ${
+        line.account_guess
+          ? "bg-slate-50 border-slate-200 text-slate-900"
+          : "bg-red-50 border-red-200 text-red-600"
+      }`}
+                          >
+                            {line.accountId
+                              ? filteredAccounts?.find(
+                                  (a) => a.account_id === line.accountId
+                                )
+                                ? `${filteredAccounts.find((a) => a.account_id === line.accountId).account_name}
+             (${filteredAccounts.find((a) => a.account_id === line.accountId).account_code})`
+                                : "Account linked"
+                              : line.account_guess
+                                ? `AI: ${line.account_guess}`
+                                : "No account"}
                           </div>
                         </td>
                         <td className="p-2">
