@@ -81,6 +81,7 @@ const ComplianceChecklist = ({ data }: { data: any }) => {
   );
 };
 
+
 export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
