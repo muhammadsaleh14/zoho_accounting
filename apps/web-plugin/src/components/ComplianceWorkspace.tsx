@@ -291,6 +291,7 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
     return <BankStatementView data={invoice.bankStatementData} />;
   }
 
+
   
   // ... (JSX Return - exactly as before) ...
   return (
