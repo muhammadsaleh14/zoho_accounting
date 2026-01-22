@@ -23,13 +23,23 @@ class Invoice(Base):
     
     date = Column(Date, nullable=True)
     due_date = Column(Date, nullable=True)
+    date_of_supply = Column(Date, nullable=True)
     
     amount = Column(Float, default=0.0)
     currency = Column(String, default="AED")
+    currency_rate = Column(Float, default=1.0)
     tax_amount = Column(Float, default=0.0)
+    tax_percentage = Column(Float, nullable=True)
+    is_reverse_charge = Column(Boolean, default=False)
     
     invoice_number = Column(String, index=True, nullable=True)
     reference_number = Column(String, nullable=True) # Ensure this exists
+    
+    # VAT Compliance Fields
+    supplier_trn = Column(String, nullable=True)
+    supplier_address = Column(String, nullable=True)
+    customer_trn = Column(String, nullable=True)
+    customer_address = Column(String, nullable=True)
     
     # --- NEW: Store the AI Summary ---
     notes = Column(String, nullable=True)
@@ -51,6 +61,9 @@ class LineItem(Base):
     description = Column(String, nullable=False)
     quantity = Column(Float, default=1.0)
     rate = Column(Float, default=0.0)
+    tax_rate = Column(Float, nullable=True)
+    tax_amount = Column(Float, nullable=True)
+    is_reverse_charge = Column(Boolean, default=False)
     zoho_account_id = Column(String, nullable=True)
     invoice = relationship("Invoice", back_populates="line_items")
     account_guess = Column(String, nullable=True)

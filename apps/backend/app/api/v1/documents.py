@@ -173,7 +173,7 @@ async def upload_document(
     mime_type = file.content_type or "application/pdf"
 
     print(f"--- Analyzing {original_filename} with Gemini (Real Flow) ---")
-    extracted_data = await analyze_document(file_bytes, db, mime_type, filename=file.filename)
+    extracted_data = await analyze_document(file_bytes, db, mime_type, filename=file.filename, user_selected_category=category)
 
     # **CRITICAL**: Override category with user selection
     extracted_data.category = category
@@ -192,6 +192,8 @@ async def upload_document(
             "vendor_id": extracted_data.vendor.existing_id if extracted_data.vendor else None,
             "vendor_name_raw": extracted_data.vendor.name if extracted_data.vendor else "Unknown",
             "date": extracted_data.date,
+            "due_date": extracted_data.due_date,
+            "date_of_supply": extracted_data.date_of_supply,
             "invoice_number": extracted_data.invoice_number,
             "reference_number": extracted_data.reference_number, # Ensure this is mapped
             
@@ -200,7 +202,17 @@ async def upload_document(
             
             "amount": extracted_data.total_amount,
             "tax_amount": extracted_data.tax_amount,
+            "tax_percentage": extracted_data.tax_percentage,
+            "is_reverse_charge": extracted_data.is_reverse_charge,
             "currency": extracted_data.currency,
+            "currency_rate": extracted_data.currency_rate,
+            
+            # --- NEW: VAT Compliance Fields ---
+            "supplier_trn": extracted_data.supplier_trn,
+            "supplier_address": extracted_data.supplier_address,
+            "customer_trn": extracted_data.customer_trn,
+            "customer_address": extracted_data.customer_address,
+            
             "status": "review",
             "category": category, 
             "image_url": image_url_for_db,

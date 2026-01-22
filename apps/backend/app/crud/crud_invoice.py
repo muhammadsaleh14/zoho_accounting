@@ -32,7 +32,11 @@ def create_invoice_with_lines(
                 rate=item.get("rate", 0.0),
                 zoho_account_id=item.get("accountId"),
                 # --- NEW: Save the raw AI guess ---
-                account_guess=item.get("account_guess") 
+                account_guess=item.get("account_guess"),
+                # --- NEW: VAT fields ---
+                tax_rate=item.get("tax_rate"),
+                tax_amount=item.get("tax_amount"),
+                is_reverse_charge=item.get("is_reverse_charge", False)
             )
             lines.append(line)
         

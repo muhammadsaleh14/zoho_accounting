@@ -3,7 +3,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
-# 1. Line Item (Updated with Customer Details)
+# 1. Line Item (Updated with Customer Details and VAT)
 class BillLineCreate(BaseModel):
     description: str
     rate: float
@@ -12,8 +12,13 @@ class BillLineCreate(BaseModel):
     
     # NEW: For associating an expense with a customer (Billable)
     customer_id: Optional[str] = None 
+    
+    # --- VAT Fields ---
+    tax_rate: Optional[float] = None
+    tax_amount: Optional[float] = None
+    is_reverse_charge: Optional[bool] = False
 
-# 2. The Main Request Object (Updated with "New Bill" fields)
+# 2. The Main Request Object (Updated with "New Bill" fields and VAT Compliance)
 class BillApproveRequest(BaseModel):
     # --- FIXED: ADDED ID and CATEGORY FOR CONTEXT ---
     id: int # The local database ID of the document being processed
@@ -29,6 +34,7 @@ class BillApproveRequest(BaseModel):
     bill_number: str
     date: str           # YYYY-MM-DD
     due_date: str       # YYYY-MM-DD
+    date_of_supply: Optional[str] = None  # YYYY-MM-DD
     
     # Full Zoho Fields
     order_number: Optional[str] = None # Maps to reference_number
@@ -38,6 +44,16 @@ class BillApproveRequest(BaseModel):
     adjustment: float = 0.0
     discount: float = 0.0
     tax_amount: float = 0.0 # Added tax amount for payload
+    
+    # --- VAT Compliance Fields ---
+    tax_percentage: Optional[float] = None
+    is_reverse_charge: Optional[bool] = False
+    supplier_trn: Optional[str] = None
+    supplier_address: Optional[str] = None
+    customer_trn: Optional[str] = None
+    customer_address: Optional[str] = None
+    date_of_supply: Optional[str] = None  # YYYY-MM-DD
+    place_of_supply: Optional[str] = None
     
     line_items: List[BillLineCreate]
     
