@@ -86,7 +86,7 @@ export function ComplianceWorkspace({ invoice, onSuccess }: Props) {
   const navigate = useNavigate();
 
   // 1. DETERMINE TYPE
-  const isSalesInvoice = true //invoice.category === "invoice";
+  const isSalesInvoice = invoice.category === "invoice";
   console.log("Invoice category:", invoice.category, "Is sales invoice:", isSalesInvoice);
 
   const [scale, setScale] = useState(1);
