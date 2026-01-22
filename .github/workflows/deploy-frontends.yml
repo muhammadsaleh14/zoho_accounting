@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - main # This should be your main development branch
+      - me
 
 jobs:
   build-and-deploy:
