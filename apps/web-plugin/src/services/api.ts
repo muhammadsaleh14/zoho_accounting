@@ -3,7 +3,8 @@
 import axios from "axios";
 import type { Invoice, LedgerAccount } from "@receipt-app/shared";
 
-export const API_BASE_URL = "http://localhost:8000/api/v1";
+export const API_BASE_URL = "https://polemoniaceous-disclamatory-brett.ngrok-free.dev/api/v1";
+
 
 const axiosConfig = {
   headers: {
