@@ -2,14 +2,7 @@
 import { useState, useRef, type ChangeEvent, type DragEvent } from "react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { api } from "../services/api";
-import {
-  Upload,
-  FileText,
-  X,
-  CheckCircle2,
-  FileType,
-  Loader2,
-} from "lucide-react";
+import { Upload, FileText, X, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface DocumentUploadProps {
@@ -21,7 +14,8 @@ export function DocumentUpload({ onClose }: DocumentUploadProps) {
   const navigate = useNavigate();
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [docType, setDocType] = useState("bill");
+  const [docType, setDocType] = useState("invoice"); // Default to invoice for tax invoice demo
+  const [aiDetectedType, setAiDetectedType] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const uploadMutation = useMutation({
@@ -64,14 +58,48 @@ export function DocumentUpload({ onClose }: DocumentUploadProps) {
     e.stopPropagation();
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
+      const droppedFile = e.dataTransfer.files[0];
+      setFile(droppedFile);
+      
+      // Auto-detect document type based on filename
+      const fileName = droppedFile.name.toLowerCase();
+      let detectedType = "invoice"; // Default to invoice for tax invoice demo
+      
+      if (fileName.includes('bill') || fileName.includes('expense')) {
+        detectedType = "bill";
+      } else if (fileName.includes('bank') || fileName.includes('statement')) {
+        detectedType = "bank_statement";
+      }
+      
+      setAiDetectedType(detectedType);
+      // Update the document type if AI detects something different
+      if (detectedType !== docType) {
+        setDocType(detectedType);
+      }
     }
   };
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleChange = async (e: ChangeEvent<HTMLInputElement>) => {
     e.preventDefault();
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+      setFile(selectedFile);
+      
+      // Auto-detect document type based on filename
+      const fileName = selectedFile.name.toLowerCase();
+      let detectedType = "invoice"; // Default to invoice for tax invoice demo
+      
+      if (fileName.includes('bill') || fileName.includes('expense')) {
+        detectedType = "bill";
+      } else if (fileName.includes('bank') || fileName.includes('statement')) {
+        detectedType = "bank_statement";
+      }
+      
+      setAiDetectedType(detectedType);
+      // Update the document type if AI detects something different
+      if (detectedType !== docType) {
+        setDocType(detectedType);
+      }
     }
   };
 
@@ -159,9 +187,14 @@ export function DocumentUpload({ onClose }: DocumentUploadProps) {
                 <button
                   key={type}
                   onClick={() => setDocType(type)}
-                  className={`px-4 py-3 rounded-2xl text-xs font-bold capitalize transition-all duration-300 border-2 ${docType === type ? "bg-brand-600 text-white border-brand-600" : "bg-white text-slate-500 border-slate-100 hover:border-brand-200"}`}
+                  className={`px-4 py-3 rounded-2xl text-xs font-bold capitalize transition-all duration-300 border-2 ${docType === type ? "bg-brand-600 text-white border-brand-600" : "bg-white text-slate-500 border-slate-100 hover:border-brand-200"} ${aiDetectedType === type && aiDetectedType !== docType ? "ring-2 ring-brand-400 ring-offset-2" : ""}`}
                 >
-                  {type.replace("_", " ")}
+                  <div className="flex items-center gap-2">
+                    {type.replace("_", " ")}
+                    {aiDetectedType === type && aiDetectedType !== docType && (
+                      <span className="bg-amber-100 text-amber-700 text-[9px] px-2 py-0.5 rounded font-bold">AI Detected</span>
+                    )}
+                  </div>
                 </button>
               ))}
             </div>

@@ -20,6 +20,10 @@ export interface LineItem {
   customerId?: string | null;
   // --- NEW ---
   account_guess?: string | null;
+  // --- VAT Fields ---
+  tax_rate?: number | null;
+  tax_amount?: number | null;
+  is_reverse_charge?: boolean;
 }
 
 export interface ComplianceDetails {
@@ -51,6 +55,7 @@ export interface Invoice {
   date: string;
   due_date?: string;
   dueDate?: string;
+  date_of_supply?: string;
 
   invoice_number?: string;
   invoiceNumber?: string;
@@ -63,9 +68,18 @@ export interface Invoice {
   amount: number;
   total_amount?: number;
   tax_amount: number;
+  tax_percentage?: number | null;
+  is_reverse_charge?: boolean;
   currency: string;
+  currency_rate?: number;
   discount?: number;
   adjustment?: number;
+
+  // --- VAT Compliance Fields ---
+  supplier_trn?: string | null;
+  supplier_address?: string | null;
+  customer_trn?: string | null;
+  customer_address?: string | null;
 
   line_items?: LineItem[];
   lineItems?: LineItem[];

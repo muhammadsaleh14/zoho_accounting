@@ -234,3 +234,68 @@ async def fetch_chart_of_accounts() -> List[Dict[str, Any]]:
                 break
     
     return all_accounts
+
+
+# --- NEW: Create Account Function ---
+async def create_zoho_account(account_name: str, account_type: str) -> Dict[str, Any]:
+    """
+    Create a new account in Zoho Books
+    
+    Args:
+        account_name: Name of the account
+        account_type: Type of account (Income, Expense, etc.)
+    
+    Returns:
+        Dict with account_id and details
+    """
+    token = await get_access_token()
+    if not token:
+        raise Exception("No access token available")
+    
+    headers = {"Authorization": f"Zoho-oauthtoken {token}"}
+    
+    # Map our account types to Zoho account types
+    zoho_account_types = {
+        "Software Subscriptions": "expense",
+        "Professional Fees": "expense", 
+        "Office Rent": "expense",
+        "Utilities": "expense",
+        "Marketing Expenses": "expense",
+        "Travel Expenses": "expense",
+        "Office Supplies": "expense",
+        "Bank Charges": "expense",
+        "Insurance Expense": "expense",
+        "Miscellaneous Expenses": "expense",
+        "Consulting Services": "income",
+        "Software Development": "income",
+        "Design Services": "income",
+        "Technical Support": "income",
+        "Maintenance Services": "income",
+        "Software Sales": "income",
+        "License Revenue": "income",
+        "Subscription Revenue": "income",
+        "Service Revenue": "income"
+    }
+    
+    zoho_type = zoho_account_types.get(account_name, "expense" if "expense" in account_type.lower() else "income")
+    
+    payload = {
+        "account_name": account_name,
+        "account_type": zoho_type,
+        "description": f"Auto-created account for {account_name}",
+        "status": "active"
+    }
+    
+    url = f"https://books.zoho.com/api/v3/chartofaccounts?organization_id={settings.ZOHO_ORG_ID}"
+    
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(url, headers=headers, json=payload)
+        data = resp.json()
+        
+        if data.get("code") == 0:
+            account = data.get("chartofaccount", {})
+            print(f"✅ Created Zoho account: {account_name} (ID: {account.get('account_id')})")
+            return account
+        else:
+            error_msg = data.get("message", "Unknown error")
+            raise Exception(f"Failed to create Zoho account: {error_msg}")

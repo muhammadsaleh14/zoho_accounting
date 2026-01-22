@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.schemas.payables import BillApproveRequest
 from app.services.zoho import create_zoho_contact, create_zoho_bill_or_invoice, upload_attachment_to_bill, fetch_all_contacts
 from app.crud import crud_account, crud_vendor, crud_invoice
+from app.services.account_mapper import AccountMapper
 
 from app.core.config import settings
 from app.services.mock_factory import mock_service
@@ -99,8 +100,19 @@ async def approve_document(
             "due_date": data.due_date,
             "line_items": zoho_lines,
             "notes": data.subject,
-            "reference_number": data.order_number
+            "reference_number": data.order_number,
+            # --- VAT Compliance Fields ---
+            "tax_percentage": data.tax_percentage,
+            "is_reverse_charge": data.is_reverse_charge,
+            "supplier_trn": data.supplier_trn,
+            "supplier_address": data.supplier_address,
+            "customer_trn": data.customer_trn,
+            "customer_address": data.customer_address,
         }
+        
+        # Add date of supply if available
+        if data.date_of_supply:
+            payload["date_of_supply"] = data.date_of_supply
 
         # 2. CONTACT HANDLING
         final_contact_id = data.zoho_contact_id
@@ -141,16 +153,60 @@ async def approve_document(
     # --- SIMULATED REAL MODE START (Since DEMO_MODE is False) ---
     print(f"🚀 Real Approval Flow triggered for {data.contact_name} (Category: {data.category})")
 
-    # 1. PREPARE THE PAYLOAD
+    # 1. PREPARE THE PAYLOAD & ENSURE ACCOUNTS EXIST
     zoho_lines = []
     for item in data.line_items:
-        zoho_lines.append({
-            "account_id": item.account_id, 
+        # For tax invoices, we're dealing with sales/income accounts
+        account_type = "income" if data.category == "invoice" else "expense"
+        
+        if item.account_id and item.account_id != "null":
+            # Account already has Zoho ID
+            zoho_account_id = item.account_id
+        else:
+            # Try to create/find account based on description or account_guess
+            account_name = item.account_guess or "Service Revenue"  # Default to income account for invoices
+            print(f"🔧 Ensuring account exists: {account_name}")
+            
+            try:
+                zoho_account_id = await AccountMapper.ensure_account_exists(
+                    account_name=account_name,
+                    account_type=account_type,
+                    db=db
+                )
+                if not zoho_account_id:
+                    print(f"⚠️ Could not create/find account: {account_name}")
+                    zoho_account_id = "fallback_account_id"  # Fallback
+            except Exception as e:
+                print(f"❌ Error creating account {account_name}: {e}")
+                zoho_account_id = "fallback_account_id"  # Fallback
+        
+        # Build line item with tax information
+        line_item = {
+            "account_id": zoho_account_id, 
             "description": item.description,
             "rate": item.rate,
             "quantity": item.quantity,
-            "tax_id": REAL_ZOHO_TAX_5_ID,
-        })
+        }
+        
+        # Add tax information if available
+        if hasattr(item, 'tax_rate') and item.tax_rate is not None:
+            if item.is_reverse_charge:
+                line_item["tax_id"] = None  # No tax for reverse charge
+                line_item["tax_percentage"] = 0
+                line_item["is_reverse_charge_applied"] = True
+            else:
+                # Map tax rate to Zoho tax ID (simplified for now)
+                if item.tax_rate == 5.0:
+                    line_item["tax_id"] = REAL_ZOHO_TAX_5_ID
+                elif item.tax_rate == 0.0:
+                    line_item["tax_id"] = None
+                else:
+                    line_item["tax_id"] = REAL_ZOHO_TAX_5_ID  # Default to 5%
+        else:
+            # Default tax handling
+            line_item["tax_id"] = REAL_ZOHO_TAX_5_ID
+        
+        zoho_lines.append(line_item)
         
     payload = {
         "date": data.date,
